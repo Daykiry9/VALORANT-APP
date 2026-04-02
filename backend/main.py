@@ -19,7 +19,7 @@ app.add_middleware(
 
 # Backwards compatibility while refactoring routes
 from routers import scrims
-from api.routes import teams, players, auth, analytics, ai
+from api.routes import teams, players, auth, analytics, ai, reports
 
 app.include_router(scrims.router, prefix="/api/scrims", tags=["scrims"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
@@ -27,7 +27,8 @@ app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "VAL Analytics Platform API is running safely with Gemini AI"}
+    return {"status": "ok", "message": "VAL Analytics Platform API is running safely with Gemini AI and PDF Reporting"}

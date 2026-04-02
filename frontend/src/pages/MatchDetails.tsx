@@ -1,10 +1,16 @@
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2 } from 'lucide-react';
+import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2, FileDown } from 'lucide-react';
 
 export function MatchDetails() {
   const { matchId } = useParams();
   const [aiInsight, setAiInsight] = React.useState<string | null>(null);
   const [loadingAi, setLoadingAi] = React.useState(false);
+
+  const handleExportPDF = () => {
+    // In real app: window.open(`/api/reports/match/${matchId}/pdf`, '_blank');
+    alert("Exporting Tactical PDF Report (Franchise Tier Feature)");
+  };
 
   const getAiInsight = async () => {
     setLoadingAi(true);
@@ -50,7 +56,12 @@ export function MatchDetails() {
         </div>
         <div className="flex gap-4">
            <button className="bg-bg-surface border border-border-default text-white px-4 py-2 font-mono text-[10px] hover:bg-bg-base transition-all">VOD LINK</button>
-           <button className="bg-accent text-white px-4 py-2 font-mono text-[10px] font-bold hover:bg-white hover:text-black transition-all">SHARE REPORT</button>
+           <button 
+             onClick={handleExportPDF}
+             className="bg-accent text-white px-4 py-2 font-mono text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center gap-2"
+           >
+             <FileDown size={14} /> EXPORT PDF
+           </button>
         </div>
       </div>
 
