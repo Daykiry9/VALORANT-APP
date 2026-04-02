@@ -2,14 +2,19 @@ import os
 import logging
 from sqlalchemy.orm import Session
 import google.generativeai as genai
+import anthropic
 import models
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Configuración de Gemini AI
+# API Keys
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+# Configuration
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20240620")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -20,64 +25,78 @@ class MatchAIInsightService:
 
     async def generate_match_feedback(self, match_id: str) -> str:
         """
-        Genera feedback táctico basado en los datos de la partida usando Gemini AI.
+        Generates tactical feedback using either Anthropic (preferred if available) or Gemini.
         """
         match = self.db.query(models.Match).filter(models.Match.id == match_id).first()
         if not match:
-            return "Error: Partida no encontrada en la base de datos."
+            return "Error: Match not found in database."
 
-        if not GEMINI_API_KEY:
-            return self._get_mock_feedback(match)
+        prompt = self._build_tactical_prompt(match)
 
-        try:
-            # Construir prompt táctico "War Room"
-            prompt = self._build_tactical_prompt(match)
-            
-            # Inicializar modelo
-            model = genai.GenerativeModel(MODEL_NAME)
-            
-            # Generar contenido
-            # Nota: Usamos una configuración de sistema sugerida para el tono
-            response = await model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=500,
+        # 1. Try Anthropic (Claude) if configured
+        if ANTHROPIC_API_KEY:
+            try:
+                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                message = client.messages.create(
+                    model=ANTHROPIC_MODEL,
+                    max_tokens=600,
+                    messages=[{"role": "user", "content": prompt}]
                 )
-            )
-            
-            return response.text
-            
-        except Exception as e:
-            logger.error(f"Error calling Gemini AI: {e}")
-            return f"Error en la generación de AI: {str(e)}. Fallback al análisis básico."
+                return message.content[0].text
+            except Exception as e:
+                logger.error(f"Error calling Claude API: {e}")
+                # Fallthrough to Gemini if Claude fails
+
+        # 2. Try Gemini
+        if GEMINI_API_KEY:
+            try:
+                model = genai.GenerativeModel(GEMINI_MODEL)
+                response = await model.generate_content_async(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        max_output_tokens=500,
+                    )
+                )
+                return response.text
+            except Exception as e:
+                logger.error(f"Error calling Gemini AI: {e}")
+                return self._get_mock_feedback(match)
+
+        # 3. Final Fallback
+        return self._get_mock_feedback(match)
 
     def _build_tactical_prompt(self, match: models.Match) -> str:
         players_stats = ""
         for p in match.player_stats:
-            agent_name = p.agent or "Desconocido"
-            players_stats += f"- Jugador {p.id}: Agente: {agent_name}, ACS: {p.acs}, KDA: {p.kills}/{p.deaths}/{p.assists}, FB: {p.first_bloods}\n"
+            agent_name = p.agent or "Unknown"
+            players_stats += f"- Agent: {agent_name}, ACS: {p.acs}, KDA: {p.kills}/{p.deaths}/{p.assists}, FB: {p.first_bloods}, FD: {p.first_deaths}, KAST: {p.kast_pct}%, ADR: {p.adr}\n"
 
-        prompt = f"""
-        ACTÚA COMO ANALISTA PRO DE VALORANT (TACTICAL WAR ROOM).
-        Analiza esta partida en el mapa {match.map_name or 'desconocido'}.
-        Resultado: {match.team_rounds_won} - {match.team_rounds_lost} ({match.result})
-        
-        Estadísticas de Jugadores:
+        return f"""
+        YOU ARE A PROFESSIONAL VALORANT ANALYST (TACTICAL WAR ROOM).
+        Analyze this match on map {match.map_name or 'unknown'}.
+        Result: {match.team_rounds_won} - {match.team_rounds_lost} ({match.result})
+        Data Source: {match.data_source}
+
+        Team Performance:
         {players_stats}
         
-        TAREA:
-        1. Identifica la debilidad táctica (¿Falta de agresividad en FB?, ¿Baja supervivencia?).
-        2. Menciona el jugador con mayor impacto táctico basado en ACS y FB.
-        3. Sugiere una mejora para la gestión económica o de mapa.
-        
-        FORMATO: Markdown conciso, tono militar/competitivo, máximo 150 palabras.
+        TASK:
+        Respond with exactly these 3 sections in markdown:
+        ### ⚡ MAIN PROBLEM
+        (Identify a specific tactical weakness that cost rounds)
+
+        ### 🎯 STANDOUT PLAYER
+        (Identify the high impact player and why)
+
+        ### 📋 ACTION FOR NEXT SCRIM
+        (Concrete and executable tactical recommendation)
+
+        Format: Concise markdown, military/competitive tone, max 150 words. Language: Spanish.
         """
-        return prompt
 
     def _get_mock_feedback(self, match: models.Match) -> str:
-        # Fallback si no hay API KEY
         if match.result == 'W':
-            return f"### Victoria en {match.map_name}\nExcelentes entradas. Tu ratio de FB sugiere dominio del espacio. Sugerencia: Refinar retakes para asegurar rounds flawless."
+            return "### ⚡ MAIN PROBLEM\nMinor flaws in post-plant utility usage.\n\n### 🎯 STANDOUT PLAYER\nAggressive entries secured early map control.\n\n### 📋 ACTION FOR NEXT SCRIM\nRefine site-holding utility layers."
         else:
-            return f"### Derrota en {match.map_name}\nVulnerabilidad detectada en defensa. Falta de control en zonas clave del mapa. Revisar el posicionamiento de centinelas."
+            return "### ⚡ MAIN PROBLEM\nHigh vulnerability in defensive mid-control.\n\n### 🎯 STANDOUT PLAYER\nLack of consistent support for entry fraggers.\n\n### 📋 ACTION FOR NEXT SCRIM\nPrioritize trade-fragging over individual plays."

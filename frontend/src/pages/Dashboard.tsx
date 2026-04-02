@@ -1,13 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatCard } from '../components/StatCard';
 import { MapHeatmap } from '../components/MapHeatmap';
-import { Shield } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
+import { api } from '../lib/api';
 
 interface DashboardProps {
   onOpenMatch?: (id: string) => void;
 }
 
 export function Dashboard({ onOpenMatch }: DashboardProps) {
+  const [stats, setStats] = useState<any>(null);
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      const [matches, teamStats] = await Promise.all([
+        api.getScrims(10),
+        api.getTeamStats('current-team-id')
+      ]);
+      setRecentMatches(matches);
+      setStats(teamStats);
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="text-accent animate-spin" size={40} />
+      </div>
+    );
+  }
   return (
     <div className="flex-1 p-8 overflow-y-auto">
       {/* 4.1 RSO Opt-in Banner */}
@@ -34,13 +65,13 @@ export function Dashboard({ onOpenMatch }: DashboardProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard label="WINRATE GLOBAL" value={71.4} suffix="%" delta={3.2} decimals={1} className="lg:col-span-1" />
-        <StatCard label="PARTIDAS TOTALES" value={47} prefix="" className="lg:col-span-1" />
+        <StatCard label="WINRATE GLOBAL" value={stats?.win_rate || 0} suffix="%" delta={stats?.win_rate_delta || 0} decimals={1} className="lg:col-span-1" />
+        <StatCard label="PARTIDAS TOTALES" value={stats?.total_matches || 0} prefix="" className="lg:col-span-1" />
         
         <div className="bg-bg-surface border border-border-default p-4 hover:border-accent transition-colors lg:col-span-1">
           <span className="text-[10px] font-mono uppercase text-text-secondary mb-2 tracking-wider block">RACHA RECIENTE</span>
           <div className="flex gap-2 items-center h-full pb-4">
-            {['W', 'W', 'W', 'L', 'W'].map((res, i) => (
+            {(stats?.recent_results || ['W', 'W', 'L']).map((res: string, i: number) => (
               <div key={i} className={`flex-1 h-8 flex items-center justify-center font-mono text-xs font-bold ${
                 res === 'W' ? 'bg-success/20 text-success border border-success' : 'bg-accent/20 text-accent border border-accent'
               }`}>
@@ -107,19 +138,15 @@ export function Dashboard({ onOpenMatch }: DashboardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default/30">
-              {[
-                { id: '1', map: 'Ascent', res: 'W', score: '13-10', opp: 'Team Liquid', date: '2024-03-28' },
-                { id: '2', map: 'Bind', res: 'W', score: '13-5', opp: 'LOUD', date: '2024-03-27' },
-                { id: '3', map: 'Split', res: 'L', score: '11-13', opp: 'NRG', date: '2024-03-25' },
-              ].map(match => (
+              {recentMatches.map(match => (
                 <tr key={match.id} className="hover:bg-accent/5 transition-colors group cursor-pointer" onClick={() => onOpenMatch?.(match.id)}>
-                  <td className="p-4 text-white font-bold">{match.map}</td>
+                  <td className="p-4 text-white font-bold">{match.map_name}</td>
                   <td className="p-4">
-                    <span className={match.res === 'W' ? 'text-success' : 'text-accent'}>{match.res}</span>
+                    <span className={match.result === 'W' ? 'text-success' : 'text-accent'}>{match.result}</span>
                   </td>
-                  <td className="p-4 text-text-secondary">{match.score}</td>
-                  <td className="p-4 text-white">{match.opp}</td>
-                  <td className="p-4 text-text-secondary">{match.date}</td>
+                  <td className="p-4 text-text-secondary">{match.team_rounds_won}-{match.team_rounds_lost}</td>
+                  <td className="p-4 text-white">{match.opponent_name}</td>
+                  <td className="p-4 text-text-secondary">{new Date(match.date).toLocaleDateString()}</td>
                   <td className="p-4 text-right">
                     <button className="text-accent opacity-0 group-hover:opacity-100 transition-opacity font-bold">ANALIZAR {'->'}</button>
                   </td>

@@ -7,7 +7,6 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-# (Keep it simple, focus on ignoring the major stuff)
 dist/
 build/
 *.egg-info/
@@ -16,16 +15,29 @@ build/
 venv/
 env/
 .env
+backend/.env
+frontend/.env
+*.env.local
+
+# Database files - ALWAYS ignore
+*.db
+*.sqlite
+backend/.db
+backend/.sqlite
+backend/val_analytics.db
 
 # OCR Temp
 tmp/
 
-# Node modules
+# Frontend
 node_modules/
 dist-frontend/
 
 # Logs
 *.log
+
+# Duplicate agent images folder
+backend/services/agent_images/
 
 # OS generated files
 .DS_Store

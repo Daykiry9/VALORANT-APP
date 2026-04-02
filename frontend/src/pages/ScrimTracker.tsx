@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/DataTable';
 import { StatCard } from '../components/StatCard';
 import { X, Plus, Upload, Filter, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { api } from '../lib/api';
 
 export function ScrimTracker() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [scrims] = useState<any[]>([]); 
+  const [scrims, setScrims] = useState<any[]>([]); 
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    loadScrims();
+  }, []);
+
+  const loadScrims = async () => {
+    try {
+      const data = await api.getScrims();
+      setScrims(data);
+    } catch (err) {
+      toast.error('Error loading scrims');
+    } finally {
+      setLoading(false);
+    }
+  };
   const columns = [
     { accessorKey: 'date', header: 'Date' },
     { accessorKey: 'opponent_name', header: 'Rival' },
@@ -18,12 +34,35 @@ export function ScrimTracker() {
     { accessorKey: 'vod', header: 'VOD' },
   ];
 
-  const handleCreateScrim = (e: React.FormEvent) => {
+  const handleCreateScrim = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Scrim Registrado Exitosamente', {
-      style: { background: '#00D4AA', color: '#0A0A0C' },
-    });
-    setIsPanelOpen(false);
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+      await api.createScrim(data);
+      toast.success('Scrim Registered Successfully');
+      setIsPanelOpen(false);
+      loadScrims();
+    } catch (err) {
+      toast.error('Failed to register scrim');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const loadingToast = toast.loading('Processing scoreboard (OCR)...');
+    try {
+      const result = await api.uploadScoreboard(file);
+      toast.success('OCR Complete. Data extracted.');
+      // In a real app we'd pre-fill the form with 'result' data
+    } catch (err) {
+      toast.error('OCR failed. Please enter data manually.');
+    } finally {
+      toast.dismiss(loadingToast);
+    }
   };
 
   return (
@@ -56,6 +95,7 @@ export function ScrimTracker() {
           <DataTable 
             columns={columns} 
             data={scrims} 
+            loading={loading}
             className="min-h-[500px]"
           />
         </div>
@@ -124,10 +164,11 @@ export function ScrimTracker() {
 
             <div>
               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Upload Scoreboard Image (OCR Auth)</label>
-              <div className="w-full border-2 border-dashed border-border-default bg-bg-base p-6 flex flex-col items-center justify-center text-text-secondary hover:border-accent hover:text-accent cursor-pointer transition-colors group">
+              <label className="w-full border-2 border-dashed border-border-default bg-bg-base p-6 flex flex-col items-center justify-center text-text-secondary hover:border-accent hover:text-accent cursor-pointer transition-colors group">
+                <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*" />
                 <Upload size={24} className="mb-2 group-hover:-translate-y-1 transition-transform" />
                 <span className="font-mono text-[10px]">DROP 16:9 SCREENSHOT HERE</span>
-              </div>
+              </label>
             </div>
 
             <div className="pt-4 mt-8 border-t border-border-default">

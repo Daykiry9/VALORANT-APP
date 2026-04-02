@@ -9,11 +9,13 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="VAL Analytics Platform API")
 
+# Secure CORS Configuration
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -31,4 +33,8 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "VAL Analytics Platform API is running safely with Gemini AI and PDF Reporting"}
+    return {
+        "status": "ready", 
+        "message": "VAL Analytics Platform API v1.0 Production",
+        "engines": ["Claude 3.5", "Gemini 2.5"]
+    }
