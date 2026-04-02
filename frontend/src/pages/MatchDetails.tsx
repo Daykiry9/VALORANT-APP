@@ -1,11 +1,13 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2, FileDown } from 'lucide-react';
+import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2, FileDown, Play, X } from 'lucide-react';
 
 export function MatchDetails() {
   const { matchId } = useParams();
   const [aiInsight, setAiInsight] = React.useState<string | null>(null);
   const [loadingAi, setLoadingAi] = React.useState(false);
+  const [showVod, setShowVod] = React.useState(false);
+  const [activeRound, setActiveRound] = React.useState(0);
 
   const handleExportPDF = () => {
     // In real app: window.open(`/api/reports/match/${matchId}/pdf`, '_blank');
@@ -55,7 +57,12 @@ export function MatchDetails() {
           <p className="text-text-secondary font-mono text-sm mt-1 uppercase">VS {match.opponent} • {match.date}</p>
         </div>
         <div className="flex gap-4">
-           <button className="bg-bg-surface border border-border-default text-white px-4 py-2 font-mono text-[10px] hover:bg-bg-base transition-all">VOD LINK</button>
+           <button 
+             onClick={() => setShowVod(true)}
+             className="bg-bg-surface border border-border-default text-white px-4 py-2 font-mono text-[10px] hover:bg-bg-base transition-all flex items-center gap-2"
+           >
+             <Play size={12} className="text-accent" /> WATCH VOD
+           </button>
            <button 
              onClick={handleExportPDF}
              className="bg-accent text-white px-4 py-2 font-mono text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center gap-2"
@@ -154,6 +161,41 @@ export function MatchDetails() {
            </div>
         </div>
       </div>
+
+      {/* VOD Player Modal */}
+      {showVod && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-8">
+           <div className="relative w-full max-w-5xl aspect-video bg-black border border-border-default shadow-2xl">
+              <button 
+                onClick={() => setShowVod(false)}
+                className="absolute -top-12 right-0 text-white hover:text-accent flex items-center gap-2 font-mono text-xs"
+              >
+                CLOSE [ESC] <X size={18} />
+              </button>
+              <div className="w-full h-full flex items-center justify-center">
+                 <iframe 
+                   width="100%" 
+                   height="100%" 
+                   src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+                   title="VALORANT Match VOD" 
+                   frameBorder="0" 
+                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                   allowFullScreen
+                 ></iframe>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-bg-surface/80 backdrop-blur-md p-4 border-t border-border-default">
+                 <div className="flex items-center justify-between">
+                    <div className="font-mono text-[10px] text-text-secondary tracking-widest uppercase">
+                       TIMESTAMPS: <span className="text-white ml-2 cursor-pointer hover:text-accent">R1: 0:42</span> | <span className="text-white ml-2 cursor-pointer hover:text-accent">R2: 2:15</span> | <span className="text-white ml-2 cursor-pointer hover:text-accent">CLUTCH: 12:40</span>
+                    </div>
+                    <div className="text-accent font-mono text-[10px] uppercase font-bold tracking-widest animate-pulse">
+                       LIVE COACHING MODE ACTIVE
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

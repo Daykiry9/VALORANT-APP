@@ -118,6 +118,11 @@ export function ScrimTracker() {
             </div>
             
             <div>
+              <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">VOD URL (YouTube/Twitch)</label>
+              <input type="url" placeholder="https://..." className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
+            </div>
+
+            <div>
               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Upload Scoreboard Image (OCR Auth)</label>
               <div className="w-full border-2 border-dashed border-border-default bg-bg-base p-6 flex flex-col items-center justify-center text-text-secondary hover:border-accent hover:text-accent cursor-pointer transition-colors group">
                 <Upload size={24} className="mb-2 group-hover:-translate-y-1 transition-transform" />

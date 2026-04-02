@@ -4,13 +4,9 @@ import { cn } from '../lib/utils';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'player-performance', label: 'Jugadores', icon: Users },
-  { id: 'team', label: 'Equipo', icon: Shield },
+  { id: 'team-analysis', label: 'Team Analysis', icon: Shield },
+  { id: 'player-performance', label: 'Player Stats', icon: Users },
   { id: 'scrim-tracker', label: 'Scrim Tracker', icon: FileText },
-  { id: 'analysis', label: 'Análisis de Partida', icon: Search },
-  { id: 'tryouts', label: 'Tryouts', icon: Activity },
-  { id: 'rivals', label: 'Rivales', icon: Globe },
-  { id: 'roster', label: 'Roster', icon: UserPlus },
 ];
 
 export function Sidebar({ currentTab, setCurrentTab }: { currentTab: string, setCurrentTab: (tab: string) => void }) {
