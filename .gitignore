@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+# (Keep it simple, focus on ignoring the major stuff)
+dist/
+build/
+*.egg-info/
+
+# Environments
+venv/
+env/
+.env
+
+# OCR Temp
+tmp/
+
+# Node modules
+node_modules/
+dist-frontend/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
