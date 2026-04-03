@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Mail, Lock, UserPlus, LogIn, ChevronRight } from 'lucide-react';
+import { Loader2, Mail, Lock, UserPlus, LogIn, ChevronRight, Target, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function Login() {
@@ -45,36 +45,33 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-base flex items-center justify-center p-6 relative overflow-hidden font-body">
-      {/* Visual background flair */}
-      <div className="absolute inset-0 z-0 opacity-10">
-         <div className="absolute top-0 left-0 w-full h-1 bg-accent animate-pulse" />
-         <div className="absolute top-0 left-1/4 w-[1px] h-full bg-accent/20" />
-         <div className="absolute top-0 left-2/4 w-[1px] h-full bg-accent/20" />
-         <div className="absolute top-0 left-3/4 w-[1px] h-full bg-accent/20" />
-      </div>
+    <div className="min-h-screen bg-bg-base flex items-center justify-center p-6 relative overflow-hidden font-inter">
+      {/* Dynamic Background Glows */}
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none opacity-10 bg-accent" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none opacity-5 bg-white" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-bg-surface border border-border-default p-10 w-full max-w-[420px] relative z-10 shadow-2xl"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-bg-surface border border-border-default p-8 md:p-12 w-full max-w-[480px] relative z-10 rounded-3xl shadow-2xl"
       >
-        <div className="text-center mb-10">
-          <div className="text-accent font-rajdhani text-6xl font-bold tracking-tighter mb-2 custom-glitch">
-            VAL
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-12 h-12 flex items-center justify-center bg-accent rounded-xl mb-6 shadow-[0_0_30px_rgba(255,70,85,0.3)]">
+            <Target size={24} color="#fff" strokeWidth={2.5} />
           </div>
-          <div className="text-text-secondary font-mono text-[10px] uppercase tracking-[0.3em]">
-            TACTICAL ANALYTICS PLATFORM
-          </div>
+          <h2 className="text-3xl font-rajdhani font-bold text-text-primary tracking-tight uppercase">
+            Bienvenido al Comando
+          </h2>
+          <p className="text-text-secondary text-sm font-medium mt-1">Inicia sesión para acceder al análisis táctico.</p>
         </div>
 
         <AnimatePresence mode="wait">
           {method === 'google' ? (
-            <motion.div key="google" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div key="google" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               <button
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-4 bg-white text-black py-4 font-mono text-sm font-bold hover:bg-accent hover:text-white transition-all group disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-3 bg-text-primary text-bg-base py-4 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="animate-spin" /> : (
                   <>
@@ -84,72 +81,73 @@ export function Login() {
                       <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
                       <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                     </svg>
-                    <span>CONTINUE WITH GOOGLE</span>
+                    <span>Continuar con Google</span>
                   </>
                 )}
               </button>
               <button 
                 onClick={() => setMethod('email')}
-                className="w-full mt-4 text-text-secondary font-mono text-[10px] uppercase hover:text-white transition-colors"
+                className="w-full text-text-secondary text-xs font-semibold py-2 hover:text-text-primary transition-all flex items-center justify-center gap-2"
               >
-                OR USE EMAIL REDACTED OPS
+                 o usar correo electrónico <ArrowRight size={14} />
               </button>
             </motion.div>
           ) : (
-            <motion.form key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={handleEmailAuth} className="space-y-4">
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-                <input 
-                  type="email" placeholder="COACH_EMAIL@HQ.NET" required
-                  className="w-full bg-bg-base border border-border-default pl-12 pr-4 py-3 font-mono text-sm text-white outline-none focus:border-accent"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                />
+            <motion.form key="email" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} onSubmit={handleEmailAuth} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-text-secondary ml-1">Email OPS</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                  <input 
+                    type="email" placeholder="nombre@equipo.com" required
+                    className="w-full bg-bg-elevated border border-border-default rounded-xl pl-12 pr-4 py-4 text-sm text-text-primary outline-none focus:border-accent transition-all"
+                    value={email} onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-                <input 
-                  type="password" placeholder="OPS_PASSWORD" required
-                  className="w-full bg-bg-base border border-border-default pl-12 pr-4 py-3 font-mono text-sm text-white outline-none focus:border-accent"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                />
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-text-secondary ml-1">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                  <input 
+                    type="password" placeholder="••••••••" required
+                    className="w-full bg-bg-elevated border border-border-default rounded-xl pl-12 pr-4 py-4 text-sm text-text-primary outline-none focus:border-accent transition-all"
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
               
               <button 
                 type="submit" disabled={loading}
-                className="w-full bg-accent text-white py-4 font-mono font-bold text-sm hover:bg-white hover:text-black transition-all flex items-center justify-center gap-2"
+                className="w-full bg-accent text-white py-4 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(255,70,85,0.2)]"
               >
-                {loading ? <Loader2 className="animate-spin" /> : (isSignUp ? <><UserPlus size={18} /> CREATE OPS ACCOUNT</> : <><LogIn size={18} /> INITIATE SESSION</>)}
+                {loading ? <Loader2 className="animate-spin" /> : (isSignUp ? 'Crear Cuenta' : 'Log in')}
               </button>
 
-              <div className="flex justify-between items-center px-1">
+              <div className="flex flex-col items-center gap-4 mt-6 pt-6 border-t border-border-default">
                  <button 
                    type="button" onClick={() => setIsSignUp(!isSignUp)}
-                   className="text-[10px] font-mono text-accent uppercase hover:underline"
+                   className="text-xs font-semibold text-accent hover:underline"
                  >
-                   {isSignUp ? 'Already have access?' : 'Request new ops access'}
+                   {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
                  </button>
                  <button 
                    type="button" onClick={() => setMethod('google')}
-                   className="text-[10px] font-mono text-text-secondary uppercase hover:text-white"
+                   className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-all"
                  >
-                   Back to Intel
+                   Volver a Google
                  </button>
               </div>
             </motion.form>
           )}
         </AnimatePresence>
 
-        <div className="mt-8 flex items-center gap-4 text-text-secondary opacity-30">
-          <div className="h-[1px] flex-1 bg-white" />
-          <span className="font-mono text-[10px]">SECURE OPS</span>
-          <div className="h-[1px] flex-1 bg-white" />
+        <div className="mt-12 text-center">
+          <p className="text-[10px] text-text-secondary uppercase tracking-[0.2em] leading-relaxed opacity-50">
+            Secure Tactical Infrastructure<br />
+            © 2026 VAL Analytics
+          </p>
         </div>
-
-        <p className="text-center text-text-secondary font-mono text-[9px] mt-8 uppercase tracking-widest leading-relaxed">
-          Operational Security Warning:<br />
-          This platform is for competitive analysis only. 
-          Not affiliated with Riot Games, Inc.
-        </p>
       </motion.div>
     </div>
   );
