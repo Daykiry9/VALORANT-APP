@@ -26,26 +26,27 @@ function App() {
   if (loading) return <SplashScreen />;
 
   return (
-    <React.Fragment>
+    <>
       <Toaster position="bottom-right" />
       <div className="flex h-screen w-full bg-bg-base text-text-primary font-body overflow-hidden">
-        {(currentTab !== 'landing' && currentTab !== 'login' && user) && <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />}
+        {user && currentTab !== 'landing' && currentTab !== 'login' && (
+          <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        )}
         
-        <div className={cn("flex-1 relative flex flex-col h-full overflow-hidden transition-all duration-300", (currentTab !== 'landing' && user) ? "ml-[72px]" : "ml-0")}>
-          {currentTab === 'landing' && <LandingPage onEnter={() => {
-            if (user) setCurrentTab('dashboard');
-            else setCurrentTab('login');
-          }} />}
+        <main className={cn(
+          "flex-1 relative flex flex-col h-full overflow-hidden transition-all duration-300", 
+          (user && currentTab !== 'landing' && currentTab !== 'login') ? "ml-[72px]" : "ml-0"
+        )}>
+          {currentTab === 'landing' && <LandingPage onEnter={() => user ? setCurrentTab('dashboard') : setCurrentTab('login')} />}
           {currentTab === 'login' && !user && <Login />}
-          {user && currentTab === 'dashboard' && <Dashboard onOpenMatch={(id) => setCurrentTab('match-details')} />} 
+          {user && currentTab === 'dashboard' && <Dashboard onOpenMatch={() => setCurrentTab('match-details')} />} 
           {user && currentTab === 'player-performance' && <PlayerPerformance />}
           {user && currentTab === 'scrim-tracker' && <ScrimTracker />}
           {user && currentTab === 'match-details' && <MatchDetails />}
           {user && currentTab === 'team-analysis' && <TeamAnalysis />}
-          {user && currentTab === 'login' && <Dashboard onOpenMatch={(id) => setCurrentTab('match-details')} />} 
-        </div>
+        </main>
       </div>
-    </React.Fragment>
+    </>
   );
 }
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CountUp from 'react-countup';
 import { 
   Play, 
   ChevronRight, 
@@ -142,11 +141,11 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           {/* Hero Stats */}
           <div className="grid grid-cols-3 gap-8 mt-24">
              <div className="text-center">
-                <div className="text-3xl md:text-5xl font-rajdhani font-bold text-white"><CountUp end={12000} duration={3} />+</div>
+                <div className="text-3xl md:text-5xl font-rajdhani font-bold text-white">12,000+</div>
                 <div className="text-[10px] font-mono text-text-secondary uppercase tracking-[0.2em] mt-2">Scrims Tracked</div>
              </div>
              <div className="text-center">
-                <div className="text-3xl md:text-5xl font-rajdhani font-bold text-accent"><CountUp end={540000} duration={3} />+</div>
+                <div className="text-3xl md:text-5xl font-rajdhani font-bold text-accent">540,000+</div>
                 <div className="text-[10px] font-mono text-text-secondary uppercase tracking-[0.2em] mt-2">Rounds Analyzed</div>
              </div>
              <div className="text-center">
