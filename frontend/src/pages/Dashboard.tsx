@@ -23,7 +23,7 @@ export function Dashboard({ onOpenMatch }: { onOpenMatch?: (id: string) => void 
 
   const loadDashboardData = async () => {
     try {
-      const matches = await api.getScrims(5);
+      const matches = await api.getScrims(10);
       setRecentMatches(matches);
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -34,6 +34,10 @@ export function Dashboard({ onOpenMatch }: { onOpenMatch?: (id: string) => void 
 
   const hasData = recentMatches.length > 0;
 
+  const totalMatches = recentMatches.length;
+  const wins = recentMatches.filter(m => m.result === 'W').length;
+  const winRate = totalMatches > 0 ? (wins / totalMatches * 100) : 0;
+  
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-bg-base">
@@ -80,8 +84,8 @@ export function Dashboard({ onOpenMatch }: { onOpenMatch?: (id: string) => void 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Winrate Global', value: hasData ? '64%' : '--%', icon: TrendingUp, positive: true, label_delta: 'Subida desde 0' },
-            { label: 'Partidas Totales', value: hasData ? recentMatches.length : '0', icon: Target, label_delta: 'Sube una scrim' },
+            { label: 'Winrate Global', value: hasData ? `${winRate.toFixed(1)}%` : '--%', icon: TrendingUp, positive: true, label_delta: 'Subida desde 0' },
+            { label: 'Partidas Totales', value: hasData ? totalMatches : '0', icon: Target, label_delta: 'Sube una scrim' },
             { label: 'ACS Promedio', value: hasData ? '218' : '---', icon: Activity, label_delta: 'Rendimiento individual' },
             { label: 'Agente Top', value: hasData ? 'Jett' : 'N/A', icon: MapPin, label_delta: 'Basado en scrims' },
           ].map((m, i) => (

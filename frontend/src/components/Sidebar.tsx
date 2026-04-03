@@ -6,7 +6,8 @@ import {
   FileText, 
   Settings,
   Target,
-  LogOut
+  LogOut,
+  UserPlus
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -16,6 +17,8 @@ const TABS = [
   { id: 'scrim-tracker', label: 'Scrim Tracker', icon: FileText },
   { id: 'team-analysis', label: 'Team Analysis', icon: Shield },
   { id: 'player-performance', label: 'Player Stats', icon: Users },
+  { id: 'tryouts', label: 'Tryouts', icon: UserPlus },
+  { id: 'roster', label: 'Roster', icon: Users },
 ];
 
 export function Sidebar({ currentTab, setCurrentTab }: { currentTab: string, setCurrentTab: (tab: string) => void }) {

@@ -1,69 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { api } from '../lib/api';
 import { DataTable } from '../components/DataTable';
 import { StatCard } from '../components/StatCard';
-import { X, Plus, Upload, Filter, Search } from 'lucide-react';
+import { X, Plus, Upload, Filter, Search, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { api } from '../lib/api';
 
 export function ScrimTracker() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [scrims, setScrims] = useState<any[]>([]); 
+  const [scrims, setScrims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ocrData, setOcrData] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadScrims();
+    api.getScrims()
+      .then(setScrims)
+      .catch(() => toast.error('Error cargando scrims'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const loadScrims = async () => {
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
     try {
-      const data = await api.getScrims();
-      setScrims(data);
-    } catch (err) {
-      toast.error('Error loading scrims');
+      const result = await api.uploadScoreboard(file);
+      if (result.players) {
+        setOcrData(result);
+        toast.success(`OCR: ${result.players.length} jugadores detectados`);
+      }
+    } catch {
+      toast.error('Error procesando screenshot');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
-  const columns = [
-    { accessorKey: 'date', header: 'Date' },
-    { accessorKey: 'opponent_name', header: 'Rival' },
-    { accessorKey: 'opponent_tier', header: 'Tier' },
-    { accessorKey: 'map', header: 'Map' },
-    { accessorKey: 'result', header: 'W/L/D' },
-    { accessorKey: 'score', header: 'Score' },
-    { accessorKey: 'vod', header: 'VOD' },
-  ];
 
   const handleCreateScrim = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const data = Object.fromEntries(formData.entries());
-    
+    const form = e.target as HTMLFormElement;
+    const data = {
+      opponent_name: form.rival.value,
+      match_date: new Date(form.date.value).toISOString(),
+      opponent_tier: form.tier.value,
+      map_name: form.map.value,
+      result: form.result.value,
+      team_rounds_won: parseInt(form.def.value || '0') + parseInt(form.atk.value || '0'),
+      team_rounds_lost: 13 - parseInt(form.def.value || '0'),
+      defense_rounds_won: parseInt(form.def.value || '0'),
+      attack_rounds_won: parseInt(form.atk.value || '0'),
+      def_pistol: form.defPistol.value || null,
+      att_pistol: form.atkPistol.value || null,
+      vod_link: form.vod.value || null,
+      notes: form.notes.value || null,
+      composition: JSON.stringify([]),
+      players_data: ocrData?.players || [],
+    };
     try {
       await api.createScrim(data);
-      toast.success('Scrim Registered Successfully');
+      toast.success('Scrim registrado ✓');
       setIsPanelOpen(false);
-      loadScrims();
-    } catch (err) {
-      toast.error('Failed to register scrim');
+      setOcrData(null);
+      const fresh = await api.getScrims();
+      setScrims(fresh);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al registrar scrim');
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const loadingToast = toast.loading('Processing scoreboard (OCR)...');
-    try {
-      const result = await api.uploadScoreboard(file);
-      toast.success('OCR Complete. Data extracted.');
-      // In a real app we'd pre-fill the form with 'result' data
-    } catch (err) {
-      toast.error('OCR failed. Please enter data manually.');
-    } finally {
-      toast.dismiss(loadingToast);
-    }
-  };
+  const columns = [
+    { accessorKey: 'date', header: 'Date', cell: (info: any) => new Date(info.getValue()).toLocaleDateString() },
+    { accessorKey: 'opponent_name', header: 'Rival' },
+    { accessorKey: 'opponent_tier', header: 'Tier' },
+    { accessorKey: 'map_name', header: 'Map' },
+    { accessorKey: 'result', header: 'W/L/D' },
+    { accessorKey: 'score', header: 'Score', cell: (info: any) => `${info.row.original.team_rounds_won}-${info.row.original.team_rounds_lost}` },
+    { accessorKey: 'vod_link', header: 'VOD' },
+  ];
 
   return (
     <div className="flex-1 p-8 overflow-y-auto relative h-full">
@@ -94,7 +106,7 @@ export function ScrimTracker() {
           
           {loading ? (
             <div className="min-h-[500px] flex items-center justify-center border border-border-default bg-bg-surface">
-              <span className="text-accent font-mono text-sm animate-pulse">CARGANDO SCRIMS...</span>
+              <Loader2 className="animate-spin text-accent" size={32} />
             </div>
           ) : (
             <DataTable 
@@ -122,7 +134,6 @@ export function ScrimTracker() {
         </div>
       </div>
 
-      {/* Slide-out Ingestion Panel */}
       {isPanelOpen && (
         <div className="fixed top-0 right-0 w-[450px] h-full bg-bg-surface border-l border-accent z-50 p-6 overflow-y-auto shadow-2xl">
           <div className="flex justify-between items-center mb-8 border-b border-border-default pb-4">
@@ -135,49 +146,93 @@ export function ScrimTracker() {
           <form onSubmit={handleCreateScrim} className="space-y-5 text-sm">
             <div>
               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Rival Team</label>
-              <input type="text" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" required />
+              <input name="rival" type="text" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" required />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Date</label>
-                <input type="date" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" required />
+                <input name="date" type="date" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" required />
               </div>
               <div>
                 <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Tier</label>
-                <select className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent">
+                <select name="tier" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent">
                   <option>T1</option><option>T2</option><option>T3</option><option>T4</option>
                 </select>
               </div>
             </div>
 
+            <div>
+              <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Map</label>
+              <input name="map" type="text" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" required />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Def Rounds Won</label>
-                <input type="number" min="0" max="13" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
+                <input name="def" type="number" min="0" max="13" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
               </div>
               <div>
                 <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Atk Rounds Won</label>
-                <input type="number" min="0" max="13" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
+                <input name="atk" type="number" min="0" max="13" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+               <div>
+                  <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Result</label>
+                  <select name="result" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent">
+                    <option value="W">W</option>
+                    <option value="L">L</option>
+                    <option value="D">D</option>
+                  </select>
+               </div>
+               <div>
+                  <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Def Pistol</label>
+                  <select name="defPistol" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent">
+                    <option value="W">W</option>
+                    <option value="L">L</option>
+                  </select>
+               </div>
+               <div>
+                  <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Atk Pistol</label>
+                  <select name="atkPistol" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent">
+                    <option value="W">W</option>
+                    <option value="L">L</option>
+                  </select>
+               </div>
             </div>
             
             <div>
               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">VOD URL (YouTube/Twitch)</label>
-              <input type="url" placeholder="https://..." className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
+              <input name="vod" type="url" placeholder="https://..." className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent" />
+            </div>
+
+            <div>
+               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Notes</label>
+               <textarea name="notes" className="w-full bg-bg-base border border-border-default p-2 text-white outline-none focus:border-accent h-20" />
             </div>
 
             <div>
               <label className="block text-[10px] uppercase font-mono text-text-secondary mb-1">Upload Scoreboard Image (OCR Auth)</label>
-              <label className="w-full border-2 border-dashed border-border-default bg-bg-base p-6 flex flex-col items-center justify-center text-text-secondary hover:border-accent hover:text-accent cursor-pointer transition-colors group">
-                <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*" />
-                <Upload size={24} className="mb-2 group-hover:-translate-y-1 transition-transform" />
-                <span className="font-mono text-[10px]">DROP 16:9 SCREENSHOT HERE</span>
-              </label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                className="hidden"
+                onChange={e => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+              />
+              <div onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-border-default bg-bg-base p-6 flex flex-col items-center justify-center text-text-secondary hover:border-accent hover:text-accent cursor-pointer transition-colors group">
+                {uploading ? <Loader2 className="animate-spin mb-2" size={24} /> : <Upload size={24} className="mb-2 group-hover:-translate-y-1 transition-transform" />}
+                {ocrData 
+                  ? <span className="font-mono text-[10px] text-success opacity-100">{ocrData.players?.length} jugadores detectados ✓</span>
+                  : <span className="font-mono text-[10px]">DROP 16:9 SCREENSHOT HERE</span>
+                }
+              </div>
             </div>
 
             <div className="pt-4 mt-8 border-t border-border-default">
-              <button type="submit" className="w-full bg-accent text-white font-mono font-bold tracking-wider py-3 hover:bg-accent/80 transition-colors flex justify-center items-center gap-2">
+              <button disabled={uploading} type="submit" className="w-full bg-accent text-white font-mono font-bold tracking-wider py-3 hover:bg-accent/80 transition-colors flex justify-center items-center gap-2">
                 CONFIRM & REGISTRAR
               </button>
             </div>

@@ -1,87 +1,81 @@
+import anthropic
 import os
 import logging
-import json
 from sqlalchemy.orm import Session
-import google.generativeai as genai
 import models
-from typing import Optional
 
 logger = logging.getLogger(__name__)
+_client = None
 
-# API Keys
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-# Configuration
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+def get_client():
+    global _client
+    if not _client:
+        key = os.getenv("ANTHROPIC_API_KEY")
+        if key:
+            _client = anthropic.Anthropic(api_key=key)
+    return _client
 
 class MatchAIInsightService:
     def __init__(self, db: Session):
         self.db = db
 
     async def generate_match_feedback(self, match_id: str) -> str:
-        """
-        Generates tactical feedback using Gemini 1.5 Flash (MVP Optimized).
-        """
-        match = self.db.query(models.Match).filter(models.Match.id == match_id).first()
+        match = self.db.query(models.Match).filter(
+            models.Match.id == match_id
+        ).first()
         if not match:
-            return "Error: Match not found in database."
+            return "Error: Partida no encontrada."
+        
+        client = get_client()
+        if not client:
+            return self._mock_feedback(match)
 
-        if not GEMINI_API_KEY:
-            return "Error: Gemini API Key not configured."
+        stats = self.db.query(models.MatchPlayerStat).filter(
+            models.MatchPlayerStat.match_id == match.id
+        ).all()
 
-        prompt = self._build_tactical_prompt(match)
+        players_text = "\n".join([
+            f"- Agente: {s.agent or 'N/A'}, ACS: {s.acs or 0}, "
+            f"K/D/A: {s.kills or 0}/{s.deaths or 0}/{s.assists or 0}, "
+            f"FB: {s.first_bloods or 0}, FD: {s.first_deaths or 0}, "
+            f"KAST: {s.kast_pct or 0}%, ADR: {s.adr or 0}"
+            for s in stats
+        ])
+
+        prompt = f"""Eres un analista pro de Valorant. Analiza esta partida y da insights tácticos accionables en español.
+
+Mapa: {match.map_name or 'Desconocido'}
+Resultado: {match.team_rounds_won or 0} - {match.team_rounds_lost or 0} ({match.result or 'D'})
+Rival: {match.opponent_name or 'Desconocido'} ({match.opponent_tier or 'N/A'})
+Fuente: {match.data_source or 'manual'}
+
+Stats del equipo:
+{players_text or 'Sin datos de jugadores disponibles.'}
+
+Responde con exactamente estas 3 secciones en markdown:
+### ⚡ Problema Principal
+(La debilidad táctica más importante que costó rondas)
+
+### 🎯 Jugador Destacado
+(El jugador con mayor impacto y por qué, basado en ACS y FB)
+
+### 📋 Acción para el Próximo Scrim
+(Una recomendación concreta y ejecutable para mejorar)
+
+Máximo 160 palabras total. Tono: analista de guerra, directo, sin rodeos."""
 
         try:
-            model = genai.GenerativeModel(GEMINI_MODEL)
-            # Use sync or async as needed, flash is fast enough
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=600,
-                )
+            message = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}]
             )
-            return response.text
+            return message.content[0].text
         except Exception as e:
-            logger.error(f"Error calling Gemini AI: {e}")
-            return self._get_mock_feedback(match)
+            logger.error(f"Claude API error: {e}")
+            return self._mock_feedback(match)
 
-    def _build_tactical_prompt(self, match: models.Match) -> str:
-        players_stats = ""
-        for p in match.player_stats:
-            agent_name = p.agent or "Unknown"
-            players_stats += f"- Agent: {agent_name or '?'}, ACS: {p.acs or '0'}, KDA: {p.kills}/{p.deaths}/{p.assists}, FB: {p.first_bloods or 0}, FD: {p.first_deaths or 0}, KAST: {p.kast_pct or 0}%\n"
-
-        return f"""
-        YOU ARE THE BRAIN OF THE WAR ROOM (VAL ANALYTICS AI).
-        Analyze the match data for map: {match.map_name or 'unknown'}.
-        Final Result: {match.team_rounds_won} - {match.team_rounds_lost} ({match.result})
-        Source Type: {match.data_source}
-
-        Combat In-Depth Stats:
-        {players_stats}
-        
-        TASK:
-        You must provide a high-level tactical debriefing for a professional coach.
-        Language: SPANISH.
-        Output exactly these sections in markdown:
-        ### ⚡ PROBLEMA TÁCTICO CENTRAL
-        (Identify the pattern that led to round losses or poor performance)
-
-        ### 🎯 RECONOCIMIENTO DE OPERADOR
-        (Standout player performance analysis based on stats)
-
-        ### 📋 ACCIÓN OPERATIVA (PRÓXIMO SCRIM)
-        (One specific, concrete drill or tactical change to implement next)
-
-        Format: High-end professional tone. Max 200 words.
-        """
-
-    def _get_mock_feedback(self, match: models.Match) -> str:
+    def _mock_feedback(self, match: models.Match) -> str:
         if match.result == 'W':
-            return "### ⚡ PROBLEMA TÁCTICO CENTRAL\nFallas menores en el uso de utilidad post-plant.\n\n### 🎯 RECONOCIMIENTO DE OPERADOR\nEntradas agresivas aseguraron el control temprano del mapa.\n\n### 📋 ACCIÓN OPERATIVA (PRÓXIMO SCRIM)\nRefinar las capas de utilidad al defender el sitio."
-        else:
-            return "### ⚡ PROBLEMA TÁCTICO CENTRAL\nAlta vulnerabilidad en el control defensivo de medio.\n\n### 🎯 RECONOCIMIENTO DE OPERADOR\nFalta de apoyo consistente para los fraggers de entrada.\n\n### 📋 ACCIÓN OPERATIVA (PRÓXIMO SCRIM)\nPriorizar los intercambios (trading) sobre las jugadas individuales."
+            return f"### ⚡ Buen trabajo\nVictoria sólida en {match.map_name}. Configura tu API key de Anthropic para insights detallados."
+        return f"### ⚡ Área de mejora\nDerrota en {match.map_name}. Analiza los pistol rounds. Configura tu API key para insights completos."

@@ -11,14 +11,12 @@ export function useAuth() {
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
-      setLoading(false);
     });
-
-    return () => listener.subscription.unsubscribe();
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  return { user, loading };
+  const signOut = () => supabase.auth.signOut();
+  return { user, loading, signOut };
 }

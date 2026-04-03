@@ -11,6 +11,4 @@ reportlab==4.2.2
 pillow==10.4.0
 pytesseract==0.3.13
 python-multipart==0.0.12
-alembic==1.13.3
 psycopg2-binary==2.9.9
-google-generativeai==0.8.3

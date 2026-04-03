@@ -42,3 +42,9 @@ backend/services/agent_images/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+backend/*.db
+backend/*.sqlite
+backend/.env
+frontend/.env
+.env

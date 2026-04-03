@@ -1,6 +1,8 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2, FileDown, Play, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { api } from '../lib/api';
 
 export function MatchDetails() {
   const { matchId } = useParams();
@@ -14,12 +16,28 @@ export function MatchDetails() {
     alert("Exporting Tactical PDF Report (Franchise Tier Feature)");
   };
 
+  const [displayedInsight, setDisplayedInsight] = React.useState('');
+
+  React.useEffect(() => {
+    if (!aiInsight) return;
+    let i = 0;
+    setDisplayedInsight('');
+    const timer = setInterval(() => {
+      setDisplayedInsight(aiInsight.slice(0, i));
+      i++;
+      if (i > aiInsight.length) clearInterval(timer);
+    }, 18);
+    return () => clearInterval(timer);
+  }, [aiInsight]);
+
   const getAiInsight = async () => {
+    if (!matchId) return;
     setLoadingAi(true);
     try {
-      // API call placeholder - in real app use axios/fetch to POST /api/ai/match/{id}/insights
-      await new Promise(r => setTimeout(r, 2000)); // Simulación
-      setAiInsight("### ANÁLISIS WAR ROOM (GEMINI 2.0 FLASH)\n\nLa partida en **Ascent** mostró una clara ventaja en el lado defensor (13-10). El jugador **Juan** tuvo un impacto crítico con 3 FB, dominando el sitio de A. \n\n**Debilidad:** Se detectaron 2 muertes tempranas en medio sin cobertura de utilidad.\n**Sugerencia:** Rotar centinelas hacia el 'market' más rápido cuando se detecte presión de humos.");
+      const result = await api.getMatchInsight(matchId) as any;
+      setAiInsight(result.insight || result);
+    } catch {
+      toast.error('Error generando insight');
     } finally {
       setLoadingAi(false);
     }
@@ -141,7 +159,7 @@ export function MatchDetails() {
                  <div className="bg-amber-500/5 border border-amber-500/20 p-6 min-h-[200px] flex flex-col justify-center items-center">
                     {!aiInsight ? (
                       <div className="text-center">
-                        <p className="text-amber-500/70 font-mono text-[10px] mb-4">Análisis por Gemini 2.0 Flash</p>
+                        <p className="text-amber-500/70 font-mono text-[10px] mb-4">Análisis por Claude AI — Anthropic</p>
                         <button 
                           onClick={getAiInsight}
                           disabled={loadingAi}
@@ -153,7 +171,7 @@ export function MatchDetails() {
                       </div>
                     ) : (
                       <div className="text-white font-mono text-[12px] whitespace-pre-wrap leading-relaxed">
-                        {aiInsight}
+                        {displayedInsight}
                       </div>
                     )}
                  </div>

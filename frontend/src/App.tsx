@@ -5,6 +5,8 @@ import { Dashboard } from './pages/Dashboard';
 import { PlayerPerformance } from './pages/PlayerPerformance';
 import { MatchDetails } from './pages/MatchDetails';
 import { TeamAnalysis } from './pages/TeamAnalysis';
+import { Tryouts } from './pages/Tryouts';
+import { Roster } from './pages/Roster';
 import { LandingPage } from './pages/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { 
@@ -65,6 +67,8 @@ function App() {
                 {currentTab === 'scrim-tracker' && <ScrimTracker />}
                 {currentTab === 'match-details' && <MatchDetails />}
                 {currentTab === 'team-analysis' && <TeamAnalysis />}
+                {currentTab === 'tryouts' && <Tryouts />}
+                {currentTab === 'roster' && <Roster />}
               </>
             ) : (
                // If user is NOT logged in but trying to access protected tab, force login

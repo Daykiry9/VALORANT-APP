@@ -1,40 +1,32 @@
-# VAL Analytics — Professional Tactical Platform
+# VAL Analytics — Competitive Valorant Platform
 
-VAL Analytics is an elite performance tracking and tactical analysis platform designed for competitive Valorant teams (Premier, Challengers, and Pro-Circuit).
+**Post-match analytics and scrim management platform for competitive Valorant teams.**
 
-![Dashboard Preview](https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070)
+## Overview
+VAL Analytics helps coaches and players at the Premier and semi-professional level 
+track scrimmage performance, analyze official matches, and get AI-powered tactical 
+insights to improve their game.
 
-## 🚀 Core Features
-- **OCR Scrim Tracker**: Instant data extraction from scoreboard screenshots.
-- **RSO Integration**: Automatic match synchronization via Official Riot Sign-On.
-- **AI Tactical Insights**: Pro-level feedback powered by Claude 3.5 & Gemini 2.5.
-- **Advanced Performance Analytics**: Deep-dive into KAST, ADR, FB/FD ratios, and map-specific trends.
-- **Team Global HQ**: Centralized dashboard for organizations to track multiple rosters.
+## Features
+- 📊 **Scrim Tracker** — Upload end-game screenshots; OCR extracts all player stats automatically
+- 🎯 **Player Performance** — ACS, K/D, KAST, ADR, death order analysis, benchmarks vs VCT pros
+- 🛡️ **Team Analysis** — Map pool efficiency, composition win rates, scrims vs official comparison
+- ⚡ **AI Insights** — Claude AI generates actionable tactical recommendations post-match
+- 🔗 **Riot API Integration** — Players opt-in via RSO to sync official and custom game history
+- 👥 **Tryout Comparator** — Side-by-side player comparison with AI evaluation
 
-## 🛠️ Tech Stack
-- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, Recharts.
-- **Backend**: FastAPI, SQLAlchemy, PostgreSQL.
-- **AI**: Anthropic Claude & Google Gemini.
-- **Auth/DB**: Supabase (PostgreSQL + Google OAuth).
+## Data & Privacy
+All player data requires explicit opt-in through Riot Sign On (RSO).
+No data is collected or displayed for players who have not authorized the platform.
+All analysis is post-match only — no real-time overlays or in-game data.
 
-## 📦 Setup & Installation
+## Tech Stack
+- **Frontend**: React + TypeScript + Vite + TailwindCSS + Framer Motion
+- **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
+- **Auth**: Supabase (Google OAuth) + Riot RSO
+- **AI**: Anthropic Claude API
+- **Deploy**: Vercel (frontend) + Railway (backend)
 
-### Backend
-1. `cd backend`
-2. `python -m venv venv`
-3. `source venv/bin/activate` (or `.\venv\Scripts\activate`)
-4. `pip install -r requirements.txt`
-5. Create `.env` based on `.env.example`
-6. `uvicorn main:app --reload`
-
-### Frontend
-1. `cd frontend`
-2. `npm install`
-3. Create `.env` based on `.env.example`
-4. `npm run dev`
-
-## ⚖️ Legal Disclaimer
-VAL Analytics is not affiliated with or endorsed by Riot Games, Inc. VALORANT and Riot Games are trademarks or registered trademarks of Riot Games, Inc. in the U.S. and elsewhere.
-
----
-*Built for coaches who know that data is the shortest path to a Major.*
+## Legal
+This product is not affiliated with or endorsed by Riot Games, Inc.
+VALORANT and Riot Games are trademarks of Riot Games, Inc.
