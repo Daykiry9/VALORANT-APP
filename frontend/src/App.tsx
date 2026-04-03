@@ -23,27 +23,47 @@ function App() {
   const { user, loading } = useAuth();
   const [currentTab, setCurrentTab] = useState('landing');
 
-  if (loading) return <SplashScreen />;
+  // Automatic redirect to dashboard upon successful login
+  React.useEffect(() => {
+    if (user && (currentTab === 'landing' || currentTab === 'login')) {
+      setCurrentTab('dashboard');
+    }
+  }, [user, currentTab]);
 
   return (
     <>
       <Toaster position="bottom-right" />
       <div className="flex h-screen w-full bg-bg-base text-text-primary font-body overflow-hidden">
-        {user && currentTab !== 'landing' && currentTab !== 'login' && (
+        {/* Sidebar visible only if logged in and not on landing */}
+        {user && currentTab !== 'landing' && (
           <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
         )}
         
         <main className={cn(
           "flex-1 relative flex flex-col h-full overflow-hidden transition-all duration-300", 
-          (user && currentTab !== 'landing' && currentTab !== 'login') ? "ml-[72px]" : "ml-0"
+          (user && currentTab !== 'landing') ? "ml-[72px]" : "ml-0"
         )}>
-          {currentTab === 'landing' && <LandingPage onEnter={() => user ? setCurrentTab('dashboard') : setCurrentTab('login')} />}
+          {/* Landing Page */}
+          {currentTab === 'landing' && (
+            <LandingPage onEnter={() => user ? setCurrentTab('dashboard') : setCurrentTab('login')} />
+          )}
+
+          {/* Login Page (if not logged in) */}
           {currentTab === 'login' && !user && <Login />}
-          {user && currentTab === 'dashboard' && <Dashboard onOpenMatch={() => setCurrentTab('match-details')} />} 
-          {user && currentTab === 'player-performance' && <PlayerPerformance />}
-          {user && currentTab === 'scrim-tracker' && <ScrimTracker />}
-          {user && currentTab === 'match-details' && <MatchDetails />}
-          {user && currentTab === 'team-analysis' && <TeamAnalysis />}
+
+          {/* Protected Routes */}
+          {user ? (
+            <>
+              {currentTab === 'dashboard' && <Dashboard onOpenMatch={() => setCurrentTab('match-details')} />} 
+              {currentTab === 'player-performance' && <PlayerPerformance />}
+              {currentTab === 'scrim-tracker' && <ScrimTracker />}
+              {currentTab === 'match-details' && <MatchDetails />}
+              {currentTab === 'team-analysis' && <TeamAnalysis />}
+            </>
+          ) : (
+             // If user is NOT logged in but trying to access protected tab, force login
+             currentTab !== 'landing' && currentTab !== 'login' && <Login />
+          )}
         </main>
       </div>
     </>
