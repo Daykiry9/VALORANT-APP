@@ -92,12 +92,17 @@ export function ScrimTracker() {
             </button>
           </div>
           
-          <DataTable 
-            columns={columns} 
-            data={scrims} 
-            loading={loading}
-            className="min-h-[500px]"
-          />
+          {loading ? (
+            <div className="min-h-[500px] flex items-center justify-center border border-border-default bg-bg-surface">
+              <span className="text-accent font-mono text-sm animate-pulse">CARGANDO SCRIMS...</span>
+            </div>
+          ) : (
+            <DataTable 
+              columns={columns} 
+              data={scrims} 
+              className="min-h-[500px]"
+            />
+          )}
         </div>
 
         <div className="space-y-6 flex flex-col">
