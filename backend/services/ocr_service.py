@@ -17,7 +17,7 @@ def process_scoreboard_image(image_bytes: bytes):
         img = Image.open(io.BytesIO(image_bytes))
         
         # Initialize model
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = """
         Analyze this Valorant match screenshot and extract all available data into a valid JSON object.
