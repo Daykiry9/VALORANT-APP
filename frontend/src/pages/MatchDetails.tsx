@@ -159,7 +159,7 @@ export function MatchDetails() {
                  <div className="bg-amber-500/5 border border-amber-500/20 p-6 min-h-[200px] flex flex-col justify-center items-center">
                     {!aiInsight ? (
                       <div className="text-center">
-                        <p className="text-amber-500/70 font-mono text-[10px] mb-4">Análisis por Claude AI — Anthropic</p>
+                        <p className="text-amber-500/70 font-mono text-[10px] mb-4">Análisis por Gemini 2.0 Flash</p>
                         <button 
                           onClick={getAiInsight}
                           disabled={loadingAi}

@@ -24,7 +24,7 @@ All analysis is post-match only — no real-time overlays or in-game data.
 - **Frontend**: React + TypeScript + Vite + TailwindCSS + Framer Motion
 - **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
 - **Auth**: Supabase (Google OAuth) + Riot RSO
-- **AI**: Anthropic Claude API
+- **AI**: Google Gemini 2.0 Flash API (Free Tier)
 - **Deploy**: Vercel (frontend) + Railway (backend)
 
 ## Legal

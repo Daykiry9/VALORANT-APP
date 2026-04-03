@@ -1,23 +1,20 @@
-import anthropic
+import google.generativeai as genai
 import os
 import logging
 from sqlalchemy.orm import Session
 import models
 
 logger = logging.getLogger(__name__)
-_client = None
 
-def get_client():
-    global _client
-    if not _client:
-        key = os.getenv("ANTHROPIC_API_KEY")
-        if key:
-            _client = anthropic.Anthropic(api_key=key)
-    return _client
+def configure_genai():
+    key = os.getenv("GEMINI_API_KEY")
+    if key:
+        genai.configure(api_key=key)
 
 class MatchAIInsightService:
     def __init__(self, db: Session):
         self.db = db
+        configure_genai()
 
     async def generate_match_feedback(self, match_id: str) -> str:
         match = self.db.query(models.Match).filter(
@@ -26,8 +23,7 @@ class MatchAIInsightService:
         if not match:
             return "Error: Partida no encontrada."
         
-        client = get_client()
-        if not client:
+        if not os.getenv("GEMINI_API_KEY"):
             return self._mock_feedback(match)
 
         stats = self.db.query(models.MatchPlayerStat).filter(
@@ -65,17 +61,14 @@ Responde con exactamente estas 3 secciones en markdown:
 Máximo 160 palabras total. Tono: analista de guerra, directo, sin rodeos."""
 
         try:
-            message = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=600,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return message.content[0].text
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(prompt)
+            return response.text
         except Exception as e:
-            logger.error(f"Claude API error: {e}")
+            logger.error(f"Gemini API error: {e}")
             return self._mock_feedback(match)
 
     def _mock_feedback(self, match: models.Match) -> str:
         if match.result == 'W':
-            return f"### ⚡ Buen trabajo\nVictoria sólida en {match.map_name}. Configura tu API key de Anthropic para insights detallados."
-        return f"### ⚡ Área de mejora\nDerrota en {match.map_name}. Analiza los pistol rounds. Configura tu API key para insights completos."
+            return f"### ⚡ Buen trabajo\nVictoria sólida en {match.map_name}. Configura tu GEMINI_API_KEY para insights detallados."
+        return f"### ⚡ Área de mejora\nDerrota en {match.map_name}. Analiza los pistol rounds. Configura tu GEMINI_API_KEY para insights completos."

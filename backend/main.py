@@ -36,5 +36,5 @@ def read_root():
     return {
         "status": "ready", 
         "message": "VAL Analytics Platform API v1.0 Production",
-        "engines": ["Claude 3.5", "Gemini 2.5"]
+        "engines": ["Gemini 2.0 Flash"]
     }
