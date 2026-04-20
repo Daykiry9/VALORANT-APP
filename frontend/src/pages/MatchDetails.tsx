@@ -1,219 +1,135 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { Shield, Target, Zap, TrendingUp, Clock, Map as MapIcon, Award, Sparkles, Loader2, FileDown, Play, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Download, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+import { FadePage } from '../components/motion/FadePage';
+import { DataBoundary } from '../components/ui/DataBoundary';
+import { Badge } from '../components/ui/Badge';
+import { ResultPill } from '../components/ui/ResultPill';
+import { MapThumbnail } from '../components/ui/MapThumbnail';
 import { api } from '../lib/api';
+import type { Match, MatchInsight } from '../lib/types';
 
 export function MatchDetails() {
   const { matchId } = useParams();
-  const [aiInsight, setAiInsight] = React.useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = React.useState(false);
-  const [showVod, setShowVod] = React.useState(false);
-  const [activeRound, setActiveRound] = React.useState(0);
+  const navigate = useNavigate();
+  const [match, setMatch] = useState<Match | null>(null);
+  const [insight, setInsight] = useState<MatchInsight | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleExportPDF = () => {
-    // In real app: window.open(`/api/reports/match/${matchId}/pdf`, '_blank');
-    alert("Exporting Tactical PDF Report (Franchise Tier Feature)");
-  };
-
-  const [displayedInsight, setDisplayedInsight] = React.useState('');
-
-  React.useEffect(() => {
-    if (!aiInsight) return;
-    let i = 0;
-    setDisplayedInsight('');
-    const timer = setInterval(() => {
-      setDisplayedInsight(aiInsight.slice(0, i));
-      i++;
-      if (i > aiInsight.length) clearInterval(timer);
-    }, 18);
-    return () => clearInterval(timer);
-  }, [aiInsight]);
-
-  const getAiInsight = async () => {
+  useEffect(() => {
     if (!matchId) return;
-    setLoadingAi(true);
-    try {
-      const result = await api.getMatchInsight(matchId) as any;
-      setAiInsight(result.insight || result);
-    } catch {
-      toast.error('Error generando insight');
-    } finally {
-      setLoadingAi(false);
-    }
-  };
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api.getScrims(500)
+      .then((all) => {
+        if (cancelled) return;
+        setMatch(all.find((m) => m.id === matchId) || null);
+      })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    api.getMatchInsight(matchId).then(setInsight).catch(() => {});
+    return () => { cancelled = true; };
+  }, [matchId]);
 
-  // Mock match data
-  const match = {
-    id: matchId,
-    map: 'Ascent',
-    score: '13 - 10',
-    result: 'W',
-    date: '2024-03-28',
-    opponent: 'Team Liquid',
-    stats: {
-      acs: 245,
-      kd: '1.24',
-      adr: 156,
-      hs: '24%'
-    },
-    rounds: [
-      { number: 1, winner: 'Team', type: 'Pistol', events: [{ type: 'Kill', actor: 'Juan', victim: 'ScreaM', weapon: 'Classic' }] },
-      { number: 2, winner: 'Team', type: 'Eco', events: [] },
-      { number: 3, winner: 'Opponent', type: 'Full Buy', events: [] },
-    ]
-  };
+  async function generateInsight() {
+    if (!matchId) return;
+    setAiLoading(true);
+    try {
+      const r = await api.generateMatchInsight(matchId);
+      setInsight(r);
+      toast.success('Tactical briefing generado');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'IA falló');
+    } finally { setAiLoading(false); }
+  }
 
   return (
-    <div className="flex-1 p-8 overflow-y-auto">
-      <div className="mb-8 border-b-2 border-accent pb-4 flex justify-between items-end">
-        <div>
-          <span className="text-accent font-mono text-xs tracking-[0.3em] uppercase">MATCH ANALYSIS</span>
-          <h1 className="text-3xl font-display font-medium text-white tracking-wider uppercase flex items-center gap-4">
-            {match.map} <span className={match.result === 'W' ? 'text-[#00D4AA]' : 'text-accent'}>{match.score}</span>
-          </h1>
-          <p className="text-text-secondary font-mono text-sm mt-1 uppercase">VS {match.opponent} • {match.date}</p>
-        </div>
-        <div className="flex gap-4">
-           <button 
-             onClick={() => setShowVod(true)}
-             className="bg-bg-surface border border-border-default text-white px-4 py-2 font-mono text-[10px] hover:bg-bg-base transition-all flex items-center gap-2"
-           >
-             <Play size={12} className="text-accent" /> WATCH VOD
-           </button>
-           <button 
-             onClick={handleExportPDF}
-             className="bg-accent text-white px-4 py-2 font-mono text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center gap-2"
-           >
-             <FileDown size={14} /> EXPORT PDF
-           </button>
-        </div>
-      </div>
+    <FadePage>
+      <div className="p-8 max-w-[1400px] mx-auto space-y-6">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent">
+          <ArrowLeft size={14} /> Volver
+        </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-bg-surface border border-border-default p-4">
-          <div className="text-text-secondary font-mono text-[10px] mb-1">TEAM ACS</div>
-          <div className="text-2xl text-white font-display">245</div>
-        </div>
-        <div className="bg-bg-surface border border-border-default p-4">
-          <div className="text-text-secondary font-mono text-[10px] mb-1">FB / FD</div>
-          <div className="text-2xl text-white font-display">12 / 8</div>
-        </div>
-        <div className="bg-bg-surface border border-border-default p-4">
-          <div className="text-text-secondary font-mono text-[10px] mb-1">CLUTCH %</div>
-          <div className="text-2xl text-white font-display">18%</div>
-        </div>
-        <div className="bg-bg-surface border border-border-default p-4">
-          <div className="text-text-secondary font-mono text-[10px] mb-1">ECON RATING</div>
-          <div className="text-2xl text-white font-display">64</div>
-        </div>
-      </div>
-
-      {/* Round Timeline */}
-      <div className="bg-bg-surface border border-border-default overflow-hidden">
-        <div className="bg-bg-base p-4 border-b border-border-default">
-           <h3 className="font-display text-sm tracking-widest text-white uppercase flex items-center gap-2">
-             <Clock size={16} className="text-accent" /> ROUND BY ROUND TIMELINE
-           </h3>
-        </div>
-        <div className="p-6">
-           <div className="flex gap-2 overflow-x-auto pb-4 mb-6">
-              {Array.from({ length: 23 }).map((_, i) => (
-                <div key={i} className={`flex-shrink-0 w-10 h-10 flex flex-col items-center justify-center border font-mono text-xs cursor-pointer transition-all hover:scale-110
-                  ${i < 13 ? 'bg-[#00D4AA]/10 border-[#00D4AA]/30 text-[#00D4AA]' : 'bg-accent/10 border-accent/20 text-accent'}`}>
-                  <span className="text-[8px] opacity-70">R</span>
-                  {i + 1}
+        <DataBoundary loading={loading} error={error} empty={!match} emptyMessage="Partida no encontrada.">
+          {match && (
+            <>
+              <header className="flex items-start justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <MapThumbnail mapName={match.map_name} className="w-24 h-16" variant="splash" />
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-text-secondary">Match Report</div>
+                    <h1 className="font-display text-3xl font-bold">
+                      {match.map_name || '—'} <span className="text-text-secondary">vs</span> {match.opponent_name || '—'}
+                    </h1>
+                    <div className="flex items-center gap-2 mt-2">
+                      <ResultPill result={match.result} score={`${match.team_rounds_won ?? '?'} - ${match.team_rounds_lost ?? '?'}`} />
+                      {match.opponent_tier && <Badge variant="neutral">{match.opponent_tier}</Badge>}
+                      {match.data_source && <Badge variant="accent">{match.data_source}</Badge>}
+                      {match.date && <span className="text-xs text-text-secondary">{new Date(match.date).toLocaleString()}</span>}
+                    </div>
+                  </div>
                 </div>
-              ))}
-           </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={generateInsight}
+                    disabled={aiLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm hover:bg-accent/90 disabled:opacity-60"
+                  >
+                    <Sparkles size={14} /> {aiLoading ? 'Generando…' : 'Tactical briefing'}
+                  </button>
+                  <button
+                    onClick={() => api.exportMatchPDF(match.id)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border-default text-sm hover:border-accent hover:text-accent transition-colors"
+                  >
+                    <Download size={14} /> PDF
+                  </button>
+                </div>
+              </header>
 
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
-                 <h4 className="font-display text-xs text-text-secondary mb-4 uppercase tracking-[0.2em]">KILL FEED</h4>
-                 <div className="space-y-3">
-                    {[
-                      { time: '1:42', actor: 'Juan', agent: 'Jett', victim: 'TenZ', v_agent: 'Omen', weapon: 'Vandal' },
-                      { time: '1:12', actor: 'Pedro', agent: 'Sova', victim: 'Sacy', v_agent: 'Skye', weapon: 'Phantom' },
-                      { time: '0:54', actor: 'Opponent', agent: 'Killjoy', victim: 'Luis', v_agent: 'Cypher', weapon: 'Shorty', is_enemy: true },
-                    ].map((kill, i) => (
-                       <div key={i} className={`flex items-center justify-between p-3 border-l-2 font-mono text-xs ${kill.is_enemy ? 'bg-accent/5 border-accent' : 'bg-[#00D4AA]/5 border-[#00D4AA]'}`}>
-                          <div className="flex items-center gap-3">
-                             <span className="text-text-secondary text-[10px]">{kill.time}</span>
-                             <span className="text-white font-bold">{kill.actor}</span>
-                             <span className="text-text-secondary text-[10px]">({kill.agent})</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                             <Target size={12} className="text-text-secondary" />
-                             <span className="text-white font-bold">{kill.victim}</span>
-                             <span className="text-text-secondary text-[10px]">({kill.v_agent})</span>
-                          </div>
-                       </div>
-                    ))}
-                 </div>
-              </div>
-
-              <div>
-                 <h4 className="font-display text-xs text-text-secondary mb-4 uppercase tracking-[0.2em] flex items-center gap-2">
-                   <Sparkles size={14} className="text-amber-500" /> TACTICAL AI INSIGHTS
-                 </h4>
-                 <div className="bg-amber-500/5 border border-amber-500/20 p-6 min-h-[200px] flex flex-col justify-center items-center">
-                    {!aiInsight ? (
-                      <div className="text-center">
-                        <p className="text-amber-500/70 font-mono text-[10px] mb-4">Análisis por Gemini 2.0 Flash</p>
-                        <button 
-                          onClick={getAiInsight}
-                          disabled={loadingAi}
-                          className="bg-amber-500 text-black px-4 py-2 font-mono text-[10px] font-bold hover:bg-white transition-all flex items-center gap-2"
-                        >
-                          {loadingAi ? <Loader2 className="animate-spin" size={14} /> : <Target size={14} />}
-                          {loadingAi ? 'ANALIZANDO...' : 'GENERAR TACTICAL BREIFING'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-white font-mono text-[12px] whitespace-pre-wrap leading-relaxed">
-                        {displayedInsight}
+              <section className="bg-bg-surface border border-border-default rounded-xl p-6">
+                <h2 className="font-display text-xl mb-3 flex items-center gap-2"><Sparkles size={18} className="text-accent" /> Tactical Briefing</h2>
+                {!insight ? (
+                  <p className="text-sm text-text-secondary">No hay briefing todavía. Genera uno con el botón arriba.</p>
+                ) : (
+                  <div className="space-y-4 text-sm">
+                    <InsightBlock title="Problema principal" body={insight.content.main_problem} tone="accent" />
+                    <InsightBlock title="Jugador destacado" body={insight.content.standout_player} tone="success" />
+                    <InsightBlock title="Acción para el próximo scrim" body={insight.content.next_action} tone="warning" />
+                    {insight.content.composition_read && <InsightBlock title="Composición" body={insight.content.composition_read} />}
+                    {insight.content.eco_read && <InsightBlock title="Economía" body={insight.content.eco_read} />}
+                    {insight.content.weaknesses_detected.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">Debilidades detectadas</div>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {insight.content.weaknesses_detected.map((w, i) => <li key={i}>{w}</li>)}
+                        </ul>
                       </div>
                     )}
-                 </div>
-              </div>
-           </div>
-        </div>
+                    <div className="text-[10px] font-mono text-text-secondary">
+                      v{insight.version} · {insight.model} · confianza {Math.round(insight.content.confidence * 100)}%
+                    </div>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+        </DataBoundary>
       </div>
+    </FadePage>
+  );
+}
 
-      {/* VOD Player Modal */}
-      {showVod && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-8">
-           <div className="relative w-full max-w-5xl aspect-video bg-black border border-border-default shadow-2xl">
-              <button 
-                onClick={() => setShowVod(false)}
-                className="absolute -top-12 right-0 text-white hover:text-accent flex items-center gap-2 font-mono text-xs"
-              >
-                CLOSE [ESC] <X size={18} />
-              </button>
-              <div className="w-full h-full flex items-center justify-center">
-                 <iframe 
-                   width="100%" 
-                   height="100%" 
-                   src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
-                   title="VALORANT Match VOD" 
-                   frameBorder="0" 
-                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                   allowFullScreen
-                 ></iframe>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-bg-surface/80 backdrop-blur-md p-4 border-t border-border-default">
-                 <div className="flex items-center justify-between">
-                    <div className="font-mono text-[10px] text-text-secondary tracking-widest uppercase">
-                       TIMESTAMPS: <span className="text-white ml-2 cursor-pointer hover:text-accent">R1: 0:42</span> | <span className="text-white ml-2 cursor-pointer hover:text-accent">R2: 2:15</span> | <span className="text-white ml-2 cursor-pointer hover:text-accent">CLUTCH: 12:40</span>
-                    </div>
-                    <div className="text-accent font-mono text-[10px] uppercase font-bold tracking-widest animate-pulse">
-                       LIVE COACHING MODE ACTIVE
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
+function InsightBlock({ title, body, tone }: { title: string; body: string; tone?: 'accent' | 'success' | 'warning' }) {
+  const toneCls = tone === 'accent' ? 'border-accent/40 bg-accent/5' : tone === 'success' ? 'border-success/40 bg-success/5' : tone === 'warning' ? 'border-accent-orange/40 bg-accent-orange/5' : 'border-border-default bg-bg-elevated';
+  return (
+    <div className={`p-3 rounded-lg border ${toneCls}`}>
+      <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">{title}</div>
+      <p>{body}</p>
     </div>
   );
 }

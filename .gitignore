@@ -48,3 +48,7 @@ backend/*.sqlite
 backend/.env
 frontend/.env
 .env
+
+# Python venv
+.venv/
+backend/.venv/

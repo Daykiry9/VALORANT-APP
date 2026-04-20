@@ -1,22 +1,35 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from typing import List
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
+
+from core.auth.current_user import AuthContext, get_current_user
 from database import get_db
 import models
-import schemas
+from schemas import MatchOut, ScrimCreate
 from services.ocr_service import process_scoreboard_image
 
 router = APIRouter()
 
+
 @router.post("/upload-scoreboard")
-async def upload_scoreboard(file: UploadFile = File(...)):
+async def upload_scoreboard(
+    file: UploadFile = File(...),
+    _: AuthContext = Depends(get_current_user),
+):
     contents = await file.read()
-    result = process_scoreboard_image(contents)
-    return result
+    return process_scoreboard_image(contents)
+
 
 @router.post("/")
-def create_scrim(scrim: schemas.ScrimCreate, db: Session = Depends(get_db)):
+def create_scrim(
+    scrim: ScrimCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_current_user),
+):
+    team_id = scrim.team_id or auth.require_team()
+
     db_match = models.Match(
-        team_id=scrim.team_id,
+        team_id=team_id,
         type="scrim",
         date=scrim.match_date,
         map_name=scrim.map_name,
@@ -32,42 +45,69 @@ def create_scrim(scrim: schemas.ScrimCreate, db: Session = Depends(get_db)):
         composition=scrim.composition,
         vod_link=scrim.vod_link,
         notes=scrim.notes,
-        data_source="ocr"
+        data_source="ocr",
     )
     db.add(db_match)
     db.commit()
     db.refresh(db_match)
-    
-    # create player stats
-    for pdata in scrim.players_data:
-        player_name = pdata.get("name")
-        # Lookup player or create unlinked stub
-        db_player = db.query(models.Player).filter(models.Player.display_name == player_name).first()
+
+    for row in scrim.players_data:
+        db_player = (
+            db.query(models.Player)
+            .filter(
+                models.Player.display_name == row.display_name,
+                models.Player.team_id == team_id,
+            )
+            .first()
+        )
         if not db_player:
-            db_player = models.Player(display_name=player_name, team_id=scrim.team_id, role_inferred=True, rso_linked=False)
+            db_player = models.Player(
+                display_name=row.display_name,
+                team_id=team_id,
+                role_inferred=True,
+                rso_linked=False,
+            )
             db.add(db_player)
             db.commit()
             db.refresh(db_player)
 
-        db_stat = models.MatchPlayerStat(
+        db.add(models.MatchPlayerStat(
             match_id=db_match.id,
             player_id=db_player.id,
-            agent=pdata.get("agent"),
-            acs=float(pdata.get("acs", 0) or 0),
-            kills=int(pdata.get("kills", 0) or 0),
-            deaths=int(pdata.get("deaths", 0) or 0),
-            assists=int(pdata.get("assists", 0) or 0),
-            first_bloods=int(pdata.get("fb", 0) or 0),
-            first_deaths=int(pdata.get("fd", 0) or 0),
-            hs_pct=float(str(pdata.get("hs_pct", "0")).replace("%", "")),
-            kast_pct=float(str(pdata.get("kast", "0")).replace("%", "")),
-            adr=float(pdata.get("adr", 0) or 0)
-        )
-        db.add(db_stat)
-    
-    db.commit()
-    return {"success": True, "match_id": db_match.id}
+            agent=row.agent,
+            acs=int(row.acs or 0),
+            kills=int(row.kills or 0),
+            deaths=int(row.deaths or 0),
+            assists=int(row.assists or 0),
+            first_bloods=int(row.first_bloods or 0),
+            first_deaths=int(row.first_deaths or 0),
+            hs_pct=float(row.hs_pct or 0),
+            kast_pct=float(row.kast_pct or 0),
+            adr=float(row.adr or 0),
+            plants=int(row.plants or 0),
+            defuses=int(row.defuses or 0),
+        ))
 
-@router.get("/")
-def get_scrims(db: Session = Depends(get_db), limit: int = 50):
-    return db.query(models.Match).filter(models.Match.type == "scrim").limit(limit).all()
+    db.commit()
+
+    # Invalidate analytics cache for this team.
+    from core.cache import invalidate_team
+    invalidate_team(team_id)
+
+    return {"success": True, "match_id": str(db_match.id)}
+
+
+@router.get("/", response_model=List[MatchOut])
+def get_scrims(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_current_user),
+):
+    team_id = auth.require_team()
+    return (
+        db.query(models.Match)
+        .filter(models.Match.type == "scrim", models.Match.team_id == team_id)
+        .order_by(models.Match.date.desc())
+        .limit(limit)
+        .all()
+    )

@@ -11,7 +11,7 @@ insights to improve their game.
 - 📊 **Scrim Tracker** — Upload end-game screenshots; OCR extracts all player stats automatically
 - 🎯 **Player Performance** — ACS, K/D, KAST, ADR, death order analysis, benchmarks vs VCT pros
 - 🛡️ **Team Analysis** — Map pool efficiency, composition win rates, scrims vs official comparison
-- ⚡ **AI Insights** — Claude AI generates actionable tactical recommendations post-match
+- ⚡ **AI Insights** — Gemini 2.5 Flash generates structured tactical briefings, player weakness reports, tryout verdicts, and composition reads
 - 🔗 **Riot API Integration** — Players opt-in via RSO to sync official and custom game history
 - 👥 **Tryout Comparator** — Side-by-side player comparison with AI evaluation
 
@@ -24,8 +24,32 @@ All analysis is post-match only — no real-time overlays or in-game data.
 - **Frontend**: React + TypeScript + Vite + TailwindCSS + Framer Motion
 - **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
 - **Auth**: Supabase (Google OAuth) + Riot RSO
-- **AI**: Google Gemini 2.0 Flash API (Free Tier)
+- **AI**: Google Gemini 2.5 Flash (structured JSON output, Pydantic-validated)
+- **Migrations**: Alembic
 - **Deploy**: Vercel (frontend) + Railway (backend)
+
+## Getting started (dev)
+
+### Backend
+```bash
+cd backend
+python -m venv .venv && source .venv/Scripts/activate  # or .venv/bin/activate on *nix
+pip install -r requirements.txt
+cp .env.example .env   # fill in GEMINI_API_KEY, SUPABASE_JWT_SECRET, etc.
+alembic upgrade head   # create schema
+uvicorn main:app --reload
+```
+
+Dev auth bypass: set `DEV_AUTH_BYPASS=1` in `.env` to skip Supabase JWT validation and fall back to the first user/team row.
+
+### Frontend
+```bash
+cd frontend
+pnpm install   # or npm install
+pnpm dev
+```
+
+Env: set `VITE_API_BASE_URL=http://localhost:8000`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 
 ## Legal
 This product is not affiliated with or endorsed by Riot Games, Inc.

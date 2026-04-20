@@ -1,143 +1,206 @@
-import React from 'react';
-import { BarChart3, TrendingUp, Users, Target, Activity, Share2 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  ComposedChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  Area,
-  Radar, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis 
-} from 'recharts';
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Shield, Sparkles, Swords } from 'lucide-react';
 
-const seasonalData = [
-  { name: 'Week 1', wins: 4, losses: 2, winRate: 66, kda: 1.1 },
-  { name: 'Week 2', wins: 5, losses: 1, winRate: 83, kda: 1.3 },
-  { name: 'Week 3', wins: 3, losses: 3, winRate: 50, kda: 0.9 },
-  { name: 'Week 4', wins: 6, losses: 0, winRate: 100, kda: 1.6 },
-];
-
-const teamStatsRadar = [
-  { subject: 'Utility', A: 120, B: 110, fullMark: 150 },
-  { subject: 'Entry', A: 98, B: 130, fullMark: 150 },
-  { subject: 'Clutch', A: 86, B: 130, fullMark: 150 },
-  { subject: 'Economy', A: 99, B: 100, fullMark: 150 },
-  { subject: 'Retakes', A: 85, B: 90, fullMark: 150 },
-  { subject: 'Pistol', A: 65, B: 85, fullMark: 150 },
-];
+import { FadePage } from '../components/motion/FadePage';
+import { DataBoundary } from '../components/ui/DataBoundary';
+import { KPITile } from '../components/ui/KPITile';
+import { Badge } from '../components/ui/Badge';
+import { MapThumbnail } from '../components/ui/MapThumbnail';
+import { useTeam } from '../context/TeamContext';
+import { api } from '../lib/api';
+import { chartAxisProps, chartGridProps, chartTooltipStyle, CHART_COLORS } from '../lib/chartTheme';
+import type { CompositionRead, CompositionRow, MapPoolRow, OpponentTierRow, SideWinrate, TeamSummary } from '../lib/types';
 
 export function TeamAnalysis() {
+  const { currentTeam, currentTeamId } = useTeam();
+  const [summary, setSummary] = useState<TeamSummary | null>(null);
+  const [mapPool, setMapPool] = useState<MapPoolRow[]>([]);
+  const [sides, setSides] = useState<SideWinrate | null>(null);
+  const [comps, setComps] = useState<CompositionRow[]>([]);
+  const [tiers, setTiers] = useState<OpponentTierRow[]>([]);
+  const [read, setRead] = useState<CompositionRead | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentTeamId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      api.getTeamSummary(currentTeamId),
+      api.getTeamMapPool(currentTeamId),
+      api.getTeamSideWinrate(currentTeamId),
+      api.getTeamComposition(currentTeamId),
+      api.getTeamOpponentTier(currentTeamId),
+    ])
+      .then(([s, mp, sw, cp, ot]) => {
+        if (cancelled) return;
+        setSummary(s); setMapPool(mp); setSides(sw); setComps(cp); setTiers(ot);
+      })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [currentTeamId]);
+
+  async function runCompositionRead() {
+    if (!currentTeamId) return;
+    setAiLoading(true);
+    try {
+      const r = await api.getCompositionRead(currentTeamId);
+      setRead(r);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'AI failed';
+      setError(message);
+    } finally { setAiLoading(false); }
+  }
+
   return (
-    <div className="flex-1 p-8 overflow-y-auto bg-bg-base">
-      <div className="flex justify-between items-center mb-8 border-b-2 border-accent pb-4">
-        <div>
-          <span className="text-accent font-mono text-xs tracking-[0.3em] uppercase">Phase 5: Pro Insights</span>
-          <h1 className="text-3xl font-display font-medium text-white tracking-wider uppercase">
-            Team Global Analysis
+    <FadePage>
+      <div className="p-8 max-w-[1400px] mx-auto space-y-6">
+        <header>
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-text-secondary">Team Intel</div>
+          <h1 className="font-display text-4xl font-bold tracking-tight flex items-center gap-3">
+            <Shield size={28} className="text-accent" />
+            {currentTeam?.name || 'Team Analysis'}
           </h1>
-        </div>
-        <button className="flex items-center gap-2 bg-accent/10 border border-accent text-accent px-4 py-2 hover:bg-accent hover:text-white transition-all font-mono text-sm">
-          <Share2 size={16} /> EXPORT SEASON REPORT
-        </button>
-      </div>
+        </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Radar Chart: Team Identity */}
-        <div className="lg:col-span-1 bg-bg-surface border border-border-default p-6">
-          <h3 className="font-display text-sm text-text-secondary uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Users size={16} className="text-accent" /> Team Strategic Identity
-          </h3>
-          <div className="h-[300px]">
-             <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={teamStatsRadar}>
-                  <PolarGrid stroke="#2D2D35" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#8F8F9B', fontSize: 10 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} />
-                  <Radar
-                    name="Our Team"
-                    dataKey="A"
-                    stroke="#FF4655"
-                    fill="#FF4655"
-                    fillOpacity={0.6}
-                  />
-                  <Radar
-                    name="Global Avg"
-                    dataKey="B"
-                    stroke="#00D4AA"
-                    fill="#00D4AA"
-                    fillOpacity={0.2}
-                  />
-                  <Legend />
-                </RadarChart>
-             </ResponsiveContainer>
-          </div>
-        </div>
+        <DataBoundary loading={loading} error={error} empty={!summary}>
+          {summary && sides && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <KPITile label="Winrate" value={`${summary.winrate}%`} accent={summary.winrate >= 50 ? 'success' : 'accent'} hint={`${summary.matches_played} partidas`} />
+                <KPITile label="Racha" value={summary.streak} accent={summary.streak.startsWith('W') ? 'success' : 'accent'} />
+                <KPITile label="ATK WR" value={`${sides.attack_winrate}%`} hint={`${sides.attack_rounds_won}/${sides.attack_rounds_played}`} />
+                <KPITile label="DEF WR" value={`${sides.defense_winrate}%`} hint={`${sides.defense_rounds_won}/${sides.defense_rounds_played}`} />
+              </div>
 
-        {/* Global Progress Chart */}
-        <div className="lg:col-span-2 bg-bg-surface border border-border-default p-6">
-          <h3 className="font-display text-sm text-text-secondary uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Activity size={16} className="text-[#00D4AA]" /> Seasonal Performance Trends
-          </h3>
-          <div className="h-[300px]">
-             <ResponsiveContainer width="100%" height="100%">
-               <ComposedChart data={seasonalData}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2D2D35" />
-                 <XAxis dataKey="name" stroke="#8F8F9B" fontSize={10} tickLine={false} axisLine={false} />
-                 <YAxis stroke="#8F8F9B" fontSize={10} tickLine={false} axisLine={false} />
-                 <Tooltip 
-                   contentStyle={{ backgroundColor: '#1A1A1E', border: '1px solid #2D2D35', color: '#fff' }}
-                 />
-                 <Legend />
-                 <Area type="monotone" dataKey="winRate" fill="#00D4AA" fillOpacity={0.1} stroke="#00D4AA" />
-                 <Bar dataKey="wins" barSize={20} fill="#FF4655" />
-                 <Bar dataKey="losses" barSize={20} fill="#2D2D35" />
-               </ComposedChart>
-             </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         {/* Map Win% Progress */}
-         <div className="bg-bg-surface border border-border-default p-6">
-            <h3 className="font-display text-sm text-text-secondary uppercase tracking-widest mb-4">MAP POOL EFFICIENCY</h3>
-            <div className="space-y-4">
-              {['Ascent', 'Bind', 'Haven', 'Split'].map((map, i) => (
-                <div key={map} className="space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono uppercase tracking-tighter">
-                    <span className="text-white">{map}</span>
-                    <span className="text-text-secondary">{75 - i*10}% WIN RATE</span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <section className="lg:col-span-2 bg-bg-surface border border-border-default rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display text-xl">Map pool</h2>
+                    <Badge variant="neutral">{mapPool.length} mapas</Badge>
                   </div>
-                  <div className="h-1 bg-bg-base w-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-1000 ${i === 0 ? 'bg-success' : 'bg-accent'}`}
-                      style={{ width: `${75 - i*10}%` }}
-                    />
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mapPool}>
+                        <CartesianGrid {...chartGridProps} />
+                        <XAxis dataKey="map_name" {...chartAxisProps} />
+                        <YAxis {...chartAxisProps} domain={[0, 100]} />
+                        <Tooltip contentStyle={chartTooltipStyle} />
+                        <Bar dataKey="winrate" fill={CHART_COLORS.accent} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              ))}
-            </div>
-         </div>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {mapPool.slice(0, 6).map((m) => (
+                      <div key={m.map_name} className="flex items-center gap-2 p-2 rounded border border-border-default bg-bg-elevated">
+                        <MapThumbnail mapName={m.map_name} className="w-10 h-7" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{m.map_name}</div>
+                          <div className="text-[10px] font-mono text-text-secondary">
+                            {m.games}G · {m.wins}W · Δ {m.avg_round_diff.toFixed(1)}
+                          </div>
+                        </div>
+                        <div className={`font-mono text-xs ${m.winrate >= 50 ? 'text-success' : 'text-accent'}`}>{m.winrate}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
-         {/* Advanced Heatmap Placeholder */}
-         <div className="bg-accent/5 border border-accent/20 p-6 flex flex-col justify-center items-center text-center">
-            <BarChart3 className="text-accent mb-4" size={48} />
-            <h4 className="font-display text-white uppercase tracking-widest mb-2">Kill Trajectory Heatmaps</h4>
-            <p className="text-text-secondary font-mono text-[10px] max-w-xs mx-auto">
-               Visualizing spatial dominance using VCT coordinate data. This module is active for Premier and Franchise teams.
-            </p>
-            <button className="mt-4 bg-accent text-white px-6 py-2 font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all">
-               UPGRADE FOR SPATIAL DATA
-            </button>
-         </div>
+                <aside className="bg-bg-surface border border-border-default rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-xl flex items-center gap-2">
+                      <Sparkles size={18} className="text-accent" /> Composition Read
+                    </h2>
+                    <button
+                      onClick={runCompositionRead}
+                      disabled={aiLoading}
+                      className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs hover:bg-accent/90 disabled:opacity-60"
+                    >
+                      {aiLoading ? 'Analizando…' : 'Generar'}
+                    </button>
+                  </div>
+                  {!read ? (
+                    <p className="text-sm text-text-secondary">Corre el análisis para ver synergies y sugerencias de meta.</p>
+                  ) : (
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">Synergy</div>
+                        <p>{read.synergy}</p>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">Missing roles</div>
+                        <div className="flex flex-wrap gap-1">
+                          {read.missing_roles.map((r) => <Badge key={r} variant="warning">{r}</Badge>)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">Meta suggestions</div>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {read.meta_suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </aside>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <section className="bg-bg-surface border border-border-default rounded-xl p-6">
+                  <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+                    <Swords size={18} className="text-accent" /> vs Tier
+                  </h2>
+                  {tiers.length === 0 ? (
+                    <div className="py-4 text-center text-text-secondary text-sm">Sin datos de tier del rival todavía.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tiers.map((t) => (
+                        <div key={t.tier} className="flex items-center gap-3">
+                          <div className="w-8 text-center"><Badge variant="neutral">{t.tier}</Badge></div>
+                          <div className="flex-1 bg-bg-elevated rounded-full h-2 overflow-hidden">
+                            <div className="h-full bg-accent" style={{ width: `${Math.min(100, t.winrate)}%` }} />
+                          </div>
+                          <div className="text-xs font-mono text-text-secondary w-20 text-right">{t.wins}/{t.games} · {t.winrate}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="bg-bg-surface border border-border-default rounded-xl p-6">
+                  <h2 className="font-display text-xl mb-4">Top composiciones</h2>
+                  {comps.length === 0 ? (
+                    <div className="py-4 text-center text-text-secondary text-sm">Aún sin suficiente data.</div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-[10px] font-mono uppercase tracking-wider text-text-secondary border-b border-border-default">
+                          <th className="text-left py-2 font-normal">Composición</th>
+                          <th className="text-left py-2 font-normal">Games</th>
+                          <th className="text-left py-2 font-normal">WR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comps.slice(0, 8).map((c) => (
+                          <tr key={c.composition} className="border-b border-border-default/40 last:border-0">
+                            <td className="py-2 font-mono text-xs text-text-secondary truncate max-w-[220px]">{c.composition}</td>
+                            <td className="py-2 font-mono">{c.games}</td>
+                            <td className={`py-2 font-mono ${c.winrate >= 50 ? 'text-success' : 'text-accent'}`}>{c.winrate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              </div>
+            </>
+          )}
+        </DataBoundary>
       </div>
-    </div>
+    </FadePage>
   );
 }
