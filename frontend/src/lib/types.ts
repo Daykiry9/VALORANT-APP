@@ -240,6 +240,79 @@ export interface CompositionRead {
   meta_suggestions: string[];
 }
 
+// ---------- Scouting ----------
+
+export interface OpponentListRow {
+  name: string;
+  tier: Tier | null;
+  games: number;
+  wins: number;
+  winrate: number;
+  last_faced: string | null;
+}
+
+export interface ScoutingMapRow {
+  map_name: string;
+  games: number;
+  wins: number;
+  winrate: number;
+  avg_round_diff: number;
+}
+
+export interface ScoutingPayload {
+  opponent_name: string;
+  tier: Tier | null;
+  total_games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winrate: number;
+  avg_round_diff: number;
+  by_map: ScoutingMapRow[];
+  pistol_pattern: { def_won: number; def_lost: number; att_won: number; att_lost: number };
+  recent_matches: {
+    match_id: string;
+    date: string | null;
+    map_name: string | null;
+    result: Result | null;
+    score: string;
+    composition: string | null;
+  }[];
+}
+
+export interface ScoutingAIReport {
+  threat_level: 'low' | 'medium' | 'high' | 'elite';
+  map_priority: string[];
+  map_to_ban: string[];
+  expected_playstyle: string;
+  detected_weaknesses: string[];
+  gameplan: string[];
+  pistol_read: string;
+  confidence: number;
+}
+
+// ---------- OCR ----------
+
+export interface OcrPlayerRow {
+  name: string | null;
+  agent: string | null;
+  acs: number | null;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  econ: number | null;
+  first_bloods: number | null;
+  plants: number | null;
+  defuses: number | null;
+}
+
+export interface OcrScoreboard {
+  map_name: string | null;
+  our_score: number | null;
+  rival_score: number | null;
+  scoreboard: OcrPlayerRow[];
+}
+
 // ---------- Error shape ----------
 
 export interface ApiErrorBody {

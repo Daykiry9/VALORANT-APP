@@ -8,6 +8,7 @@ import type {
   Match,
   MatchDetail,
   MatchInsight,
+  OpponentListRow,
   OpponentTierRow,
   Player,
   PlayerByAgentRow,
@@ -16,6 +17,8 @@ import type {
   PlayerTrendPoint,
   PlayerWeaknessReport,
   RoleBenchmark,
+  ScoutingAIReport,
+  ScoutingPayload,
   SideWinrate,
   Team,
   TeamSummary,
@@ -152,6 +155,13 @@ export const api = {
   getMatchInsightHistory: (matchId: string) => req<MatchInsight[]>(`/api/ai/match/${matchId}/insights/history`),
   getPlayerWeaknessReport: (playerId: string) => req<PlayerWeaknessReport>(`/api/ai/player/${playerId}/weakness-report`),
   getCompositionRead: (teamId: string) => req<CompositionRead>(`/api/ai/team/${teamId}/composition-read`),
+
+  // Scouting
+  getOpponents: (teamId: string) => req<OpponentListRow[]>(`/api/analytics/team/${teamId}/opponents`),
+  getScoutingPayload: (teamId: string, opponentName: string) =>
+    req<ScoutingPayload>(`/api/analytics/team/${teamId}/scouting/${encodeURIComponent(opponentName)}`),
+  getScoutingAIReport: (teamId: string, opponentName: string) =>
+    req<ScoutingAIReport>(`/api/ai/team/${teamId}/scouting/${encodeURIComponent(opponentName)}`),
 
   // Reports
   exportMatchPDF: (matchId: string) => window.open(`${BASE}/api/reports/match/${matchId}/pdf`, '_blank'),

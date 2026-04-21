@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, FileUp, Search, Swords } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileUp, Search, Swords, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { FadePage } from '../components/motion/FadePage';
@@ -8,10 +8,64 @@ import { DataBoundary } from '../components/ui/DataBoundary';
 import { ResultPill } from '../components/ui/ResultPill';
 import { MapThumbnail } from '../components/ui/MapThumbnail';
 import { Badge } from '../components/ui/Badge';
+import { useTeam } from '../context/TeamContext';
 import { api } from '../lib/api';
-import type { Match } from '../lib/types';
+import type { Match, OcrScoreboard } from '../lib/types';
+
+interface Draft {
+  map_name: string;
+  our_score: number;
+  rival_score: number;
+  opponent_name: string;
+  opponent_tier: string;
+  vod_link: string;
+  players: DraftPlayer[];
+}
+
+interface DraftPlayer {
+  display_name: string;
+  agent: string;
+  acs: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  first_bloods: number;
+  first_deaths: number;
+  hs_pct: number;
+  kast_pct: number;
+  adr: number;
+  plants: number;
+  defuses: number;
+}
+
+function ocrToDraft(ocr: OcrScoreboard): Draft {
+  return {
+    map_name: ocr.map_name || '',
+    our_score: ocr.our_score ?? 0,
+    rival_score: ocr.rival_score ?? 0,
+    opponent_name: '',
+    opponent_tier: '',
+    vod_link: '',
+    players: (ocr.scoreboard || []).slice(0, 5).map((p) => ({
+      display_name: p.name || '',
+      agent: p.agent || '',
+      acs: p.acs ?? 0,
+      kills: p.kills ?? 0,
+      deaths: p.deaths ?? 0,
+      assists: p.assists ?? 0,
+      first_bloods: p.first_bloods ?? 0,
+      first_deaths: 0,
+      hs_pct: 0,
+      kast_pct: 0,
+      adr: 0,
+      plants: p.plants ?? 0,
+      defuses: p.defuses ?? 0,
+    })),
+  };
+}
 
 export function ScrimTracker() {
+  const { currentTeamId } = useTeam();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +74,8 @@ export function ScrimTracker() {
   const [opponentFilter, setOpponentFilter] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [ocrPreview, setOcrPreview] = useState<unknown | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -48,9 +103,9 @@ export function ScrimTracker() {
     setUploading(true);
     try {
       const r = await api.uploadScoreboard(file);
-      if (r.success) {
-        setOcrPreview(r.data);
-        toast.success('Scoreboard extraído. Revisa y confirma.');
+      if (r.success && r.data) {
+        setDraft(ocrToDraft(r.data as OcrScoreboard));
+        toast.success('Scoreboard extraído. Revisa antes de guardar.');
       } else {
         toast.error(r.error || 'OCR falló');
       }
@@ -60,6 +115,55 @@ export function ScrimTracker() {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  async function commitDraft() {
+    if (!draft || !currentTeamId) return;
+    const result = draft.our_score > draft.rival_score ? 'W' : draft.our_score < draft.rival_score ? 'L' : 'D';
+    setSubmitting(true);
+    try {
+      await api.createScrim({
+        team_id: currentTeamId,
+        match_date: new Date().toISOString(),
+        opponent_name: draft.opponent_name || 'Desconocido',
+        opponent_tier: draft.opponent_tier || null,
+        map_name: draft.map_name || 'Unknown',
+        result,
+        team_rounds_won: draft.our_score,
+        team_rounds_lost: draft.rival_score,
+        defense_rounds_won: 0,
+        attack_rounds_won: 0,
+        composition: JSON.stringify(draft.players.map((p) => p.agent).filter(Boolean)),
+        vod_link: draft.vod_link || null,
+        players_data: draft.players.map((p) => ({
+          display_name: p.display_name,
+          agent: p.agent,
+          acs: p.acs,
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+          first_bloods: p.first_bloods,
+          first_deaths: p.first_deaths,
+          hs_pct: p.hs_pct,
+          kast_pct: p.kast_pct,
+          adr: p.adr,
+          plants: p.plants,
+          defuses: p.defuses,
+        })),
+      });
+      toast.success('Scrim guardado');
+      setDraft(null);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error guardando scrim');
+    } finally { setSubmitting(false); }
+  }
+
+  function updatePlayer(idx: number, field: keyof DraftPlayer, value: string | number) {
+    if (!draft) return;
+    const players = [...draft.players];
+    players[idx] = { ...players[idx], [field]: value };
+    setDraft({ ...draft, players });
   }
 
   return (
@@ -90,30 +194,106 @@ export function ScrimTracker() {
           </div>
         </header>
 
+        {draft && (
+          <section className="bg-bg-surface border border-accent/40 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h3 className="font-display text-xl">Revisar scrim antes de guardar</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDraft(null)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border-default text-xs hover:border-accent hover:text-accent"
+                >
+                  <Trash2 size={12} /> Descartar
+                </button>
+                <button
+                  onClick={commitDraft}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs hover:bg-accent/90 disabled:opacity-60"
+                >
+                  <CheckCircle2 size={12} /> {submitting ? 'Guardando…' : 'Guardar scrim'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <Field label="Mapa">
+                <input value={draft.map_name} onChange={(e) => setDraft({ ...draft, map_name: e.target.value })}
+                  className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm" />
+              </Field>
+              <Field label="Rival">
+                <input value={draft.opponent_name} onChange={(e) => setDraft({ ...draft, opponent_name: e.target.value })}
+                  placeholder="Nombre del rival"
+                  className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm" />
+              </Field>
+              <Field label="Tier">
+                <select value={draft.opponent_tier} onChange={(e) => setDraft({ ...draft, opponent_tier: e.target.value })}
+                  className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm">
+                  <option value="">—</option>
+                  <option>T1</option><option>T2</option><option>T3</option><option>T4</option>
+                </select>
+              </Field>
+              <Field label="Nuestro score">
+                <input type="number" value={draft.our_score} onChange={(e) => setDraft({ ...draft, our_score: Number(e.target.value) })}
+                  className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm font-mono" />
+              </Field>
+              <Field label="Rival score">
+                <input type="number" value={draft.rival_score} onChange={(e) => setDraft({ ...draft, rival_score: Number(e.target.value) })}
+                  className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm font-mono" />
+              </Field>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[10px] font-mono uppercase tracking-wider text-text-secondary border-b border-border-default">
+                    <th className="text-left py-2 px-2 font-normal">Jugador</th>
+                    <th className="text-left py-2 px-2 font-normal">Agente</th>
+                    <th className="text-left py-2 px-2 font-normal">ACS</th>
+                    <th className="text-left py-2 px-2 font-normal">K</th>
+                    <th className="text-left py-2 px-2 font-normal">D</th>
+                    <th className="text-left py-2 px-2 font-normal">A</th>
+                    <th className="text-left py-2 px-2 font-normal">FB</th>
+                    <th className="text-left py-2 px-2 font-normal">FD</th>
+                    <th className="text-left py-2 px-2 font-normal">KAST%</th>
+                    <th className="text-left py-2 px-2 font-normal">ADR</th>
+                    <th className="text-left py-2 px-2 font-normal">HS%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draft.players.map((p, i) => (
+                    <tr key={i} className="border-b border-border-default/30">
+                      <td className="py-1.5 px-1"><EditCell value={p.display_name} onChange={(v) => updatePlayer(i, 'display_name', String(v))} type="text" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.agent} onChange={(v) => updatePlayer(i, 'agent', String(v))} type="text" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.acs} onChange={(v) => updatePlayer(i, 'acs', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.kills} onChange={(v) => updatePlayer(i, 'kills', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.deaths} onChange={(v) => updatePlayer(i, 'deaths', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.assists} onChange={(v) => updatePlayer(i, 'assists', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.first_bloods} onChange={(v) => updatePlayer(i, 'first_bloods', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.first_deaths} onChange={(v) => updatePlayer(i, 'first_deaths', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.kast_pct} onChange={(v) => updatePlayer(i, 'kast_pct', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.adr} onChange={(v) => updatePlayer(i, 'adr', Number(v))} type="number" /></td>
+                      <td className="py-1.5 px-1"><EditCell value={p.hs_pct} onChange={(v) => updatePlayer(i, 'hs_pct', Number(v))} type="number" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input
-              placeholder="Mapa"
-              value={mapFilter}
-              onChange={(e) => setMapFilter(e.target.value)}
-              className="pl-8 pr-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm w-40"
-            />
+            <input placeholder="Mapa" value={mapFilter} onChange={(e) => setMapFilter(e.target.value)}
+              className="pl-8 pr-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm w-40" />
           </div>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input
-              placeholder="Rival"
-              value={opponentFilter}
-              onChange={(e) => setOpponentFilter(e.target.value)}
-              className="pl-8 pr-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm w-48"
-            />
+            <input placeholder="Rival" value={opponentFilter} onChange={(e) => setOpponentFilter(e.target.value)}
+              className="pl-8 pr-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm w-48" />
           </div>
-          <select
-            value={resultFilter}
-            onChange={(e) => setResultFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm"
-          >
+          <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-default text-sm">
             <option value="">Todos</option>
             <option value="W">Victorias</option>
             <option value="L">Derrotas</option>
@@ -121,19 +301,6 @@ export function ScrimTracker() {
           </select>
           <span className="text-xs font-mono text-text-secondary">{filtered.length} / {matches.length}</span>
         </div>
-
-        {ocrPreview !== null && (
-          <div className="bg-bg-surface border border-accent/40 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-display text-lg">OCR preview</h3>
-              <button onClick={() => setOcrPreview(null)} className="text-xs text-text-secondary hover:text-accent">Descartar</button>
-            </div>
-            <pre className="text-[11px] font-mono text-text-secondary overflow-x-auto max-h-64">
-              {JSON.stringify(ocrPreview, null, 2)}
-            </pre>
-            <p className="mt-2 text-xs text-text-secondary">Confirma visualmente y crea el scrim con POST /api/scrims/.</p>
-          </div>
-        )}
 
         <DataBoundary loading={loading} error={error} empty={!loading && matches.length === 0} emptyMessage="Sin scrims todavía. Sube tu primer scoreboard.">
           <div className="overflow-x-auto bg-bg-surface border border-border-default rounded-xl">
@@ -146,7 +313,7 @@ export function ScrimTracker() {
                   <th className="text-left px-4 py-3 font-normal">Tier</th>
                   <th className="text-left px-4 py-3 font-normal">Resultado</th>
                   <th className="text-left px-4 py-3 font-normal">Source</th>
-                  <th className="text-left px-4 py-3 font-normal"></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -178,5 +345,25 @@ export function ScrimTracker() {
         </DataBoundary>
       </div>
     </FadePage>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function EditCell({ value, onChange, type }: { value: string | number; onChange: (v: string | number) => void; type: 'text' | 'number' }) {
+  return (
+    <input
+      type={type}
+      value={value as number | string}
+      onChange={(e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
+      className="w-full bg-transparent border border-transparent hover:border-border-default focus:border-accent rounded px-1.5 py-0.5 text-xs font-mono"
+    />
   );
 }

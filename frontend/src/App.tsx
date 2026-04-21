@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { Target } from 'lucide-react';
@@ -7,14 +8,18 @@ import { TeamProvider } from './context/TeamContext';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { ScrimTracker } from './pages/ScrimTracker';
-import { PlayerPerformance } from './pages/PlayerPerformance';
-import { TeamAnalysis } from './pages/TeamAnalysis';
-import { Tryouts } from './pages/Tryouts';
-import { Roster } from './pages/Roster';
-import { MatchDetails } from './pages/MatchDetails';
-import { Settings } from './pages/Settings';
+import { OnboardingGate } from './components/OnboardingGate';
+
+// Code-split each dashboard route so the landing/login bundle stays small.
+const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
+const ScrimTracker = lazy(() => import('./pages/ScrimTracker').then((m) => ({ default: m.ScrimTracker })));
+const PlayerPerformance = lazy(() => import('./pages/PlayerPerformance').then((m) => ({ default: m.PlayerPerformance })));
+const TeamAnalysis = lazy(() => import('./pages/TeamAnalysis').then((m) => ({ default: m.TeamAnalysis })));
+const Tryouts = lazy(() => import('./pages/Tryouts').then((m) => ({ default: m.Tryouts })));
+const Roster = lazy(() => import('./pages/Roster').then((m) => ({ default: m.Roster })));
+const MatchDetails = lazy(() => import('./pages/MatchDetails').then((m) => ({ default: m.MatchDetails })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Scouting = lazy(() => import('./pages/Scouting').then((m) => ({ default: m.Scouting })));
 
 function SplashScreen() {
   return (
@@ -26,15 +31,21 @@ function SplashScreen() {
   );
 }
 
+function RouteSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<SplashScreen />}>{children}</Suspense>;
+}
+
 function AppShell() {
   return (
     <TeamProvider>
-      <div className="flex h-screen w-full bg-bg-base text-text-primary font-body overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 relative flex flex-col h-full overflow-y-auto">
-          <Outlet />
-        </main>
-      </div>
+      <OnboardingGate>
+        <div className="flex h-screen w-full bg-bg-base text-text-primary font-body overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 relative flex flex-col h-full overflow-y-auto">
+            <Outlet />
+          </main>
+        </div>
+      </OnboardingGate>
     </TeamProvider>
   );
 }
@@ -69,15 +80,17 @@ function App() {
 
         <Route path="/app" element={<ProtectedRoute />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="scrims" element={<ScrimTracker />} />
-          <Route path="team" element={<TeamAnalysis />} />
-          <Route path="players" element={<PlayerPerformance />} />
-          <Route path="players/:playerId" element={<PlayerPerformance />} />
-          <Route path="tryouts" element={<Tryouts />} />
-          <Route path="roster" element={<Roster />} />
-          <Route path="matches/:matchId" element={<MatchDetails />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="dashboard" element={<RouteSuspense><Dashboard /></RouteSuspense>} />
+          <Route path="scrims" element={<RouteSuspense><ScrimTracker /></RouteSuspense>} />
+          <Route path="team" element={<RouteSuspense><TeamAnalysis /></RouteSuspense>} />
+          <Route path="players" element={<RouteSuspense><PlayerPerformance /></RouteSuspense>} />
+          <Route path="players/:playerId" element={<RouteSuspense><PlayerPerformance /></RouteSuspense>} />
+          <Route path="tryouts" element={<RouteSuspense><Tryouts /></RouteSuspense>} />
+          <Route path="roster" element={<RouteSuspense><Roster /></RouteSuspense>} />
+          <Route path="scouting" element={<RouteSuspense><Scouting /></RouteSuspense>} />
+          <Route path="scouting/:opponent" element={<RouteSuspense><Scouting /></RouteSuspense>} />
+          <Route path="matches/:matchId" element={<RouteSuspense><MatchDetails /></RouteSuspense>} />
+          <Route path="settings" element={<RouteSuspense><Settings /></RouteSuspense>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,17 +1,17 @@
 """Analytics endpoints: player + team aggregates, benchmarks, comparison."""
-from __future__ import annotations
-
 import logging
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from core.ai.config import is_enabled
 from core.ai.prompts.tryout_verdict import generate_tryout_verdict
+from core.ratelimit import limiter
 from core.analytics.benchmarks import compute_role_benchmarks
 from core.analytics.comparison import compare_players
+from core.analytics.scouting import list_opponents, scouting_report
 from core.analytics.player_aggregates import (
     player_by_agent,
     player_by_map,
@@ -198,10 +198,35 @@ def get_team_opponent_tier(
     return team_opponent_tier(db, team_id)
 
 
+# ---------- Scouting ----------
+
+@router.get("/team/{team_id}/opponents")
+def get_opponents(
+    team_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_current_user),
+):
+    _assert_team(auth, team_id)
+    return list_opponents(db, team_id)
+
+
+@router.get("/team/{team_id}/scouting/{opponent_name}")
+def get_scouting_report(
+    team_id: UUID,
+    opponent_name: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_current_user),
+):
+    _assert_team(auth, team_id)
+    return scouting_report(db, team_id, opponent_name)
+
+
 # ---------- Compare ----------
 
 @router.post("/compare", response_model=ComparePlayersResponse)
+@limiter.limit("10/minute;60/hour")
 def compare(
+    request: Request,
     payload: ComparePlayersRequest,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_current_user),

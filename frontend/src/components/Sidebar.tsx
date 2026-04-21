@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Shield, FileText, Settings, Target, LogOut, UserPlus, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, FileText, Settings, Target, LogOut, UserPlus, ChevronDown, Crosshair } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,7 @@ const TABS = [
   { to: '/app/scrims', label: 'Scrim Tracker', icon: FileText },
   { to: '/app/team', label: 'Team Analysis', icon: Shield },
   { to: '/app/players', label: 'Player Stats', icon: Users },
+  { to: '/app/scouting', label: 'Scouting', icon: Crosshair },
   { to: '/app/tryouts', label: 'Tryouts', icon: UserPlus },
   { to: '/app/roster', label: 'Roster', icon: Users },
 ];

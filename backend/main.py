@@ -7,15 +7,22 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from core.errors import AppError
 from core.middleware import RequestIDMiddleware, current_request_id
+from core.ratelimit import limiter
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VAL Analytics Platform API", version="1.1.0")
 
+# Order matters: request-id first, then rate-limiter so rate-limit responses carry the id.
 app.add_middleware(RequestIDMiddleware)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 allowed_origins = os.getenv(
     "ALLOWED_ORIGINS",
@@ -67,6 +74,18 @@ async def validation_exc_handler(_: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
         content=_error_payload("validation_error", "Invalid request body.", {"errors": exc.errors()}),
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(_: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content=_error_payload(
+            "rate_limited",
+            "Too many requests. Please wait and retry.",
+            {"limit": str(exc.detail) if exc.detail else None},
+        ),
     )
 
 

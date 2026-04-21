@@ -3,23 +3,24 @@
 All insights are persisted to `match_insights` (versioned). Callers receive
 the latest version; history is available via `/insights/history`.
 """
-from __future__ import annotations
-
 import hashlib
 import json
 import logging
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from core.ai.config import is_enabled, model_name
 from core.ai.prompts.composition import generate_composition_read
 from core.ai.prompts.match_tactical import generate_match_insight
 from core.ai.prompts.player_weakness import generate_player_weakness_report
+from core.ai.prompts.scouting import generate_scouting_report, ScoutingReport
+from core.analytics.scouting import scouting_report as build_scouting_payload
 from core.auth.current_user import AuthContext, get_current_user
 from core.errors import NotFound, UpstreamError
+from core.ratelimit import limiter
 from database import get_db
 import models
 from schemas import (
@@ -97,7 +98,9 @@ def _row_to_out(row: models.MatchInsight) -> MatchInsightOut:
 # ---------- Match tactical insight ----------
 
 @router.post("/match/{match_id}/insights", response_model=MatchInsightOut)
+@limiter.limit("10/minute;80/hour")
 async def generate_match_tactical_insight(
+    request: Request,
     match_id: UUID,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_current_user),
@@ -155,7 +158,9 @@ def get_match_insight_history(
 # ---------- Player weakness ----------
 
 @router.get("/player/{player_id}/weakness-report", response_model=PlayerWeaknessReport)
+@limiter.limit("20/minute;150/hour")
 def get_player_weakness_report(
+    request: Request,
     player_id: UUID,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_current_user),
@@ -169,7 +174,9 @@ def get_player_weakness_report(
 # ---------- Composition ----------
 
 @router.get("/team/{team_id}/composition-read", response_model=CompositionRead)
+@limiter.limit("10/minute;60/hour")
 def get_composition_read(
+    request: Request,
     team_id: UUID,
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_current_user),
@@ -180,3 +187,25 @@ def get_composition_read(
     if not is_enabled():
         raise UpstreamError("Gemini API key not configured.")
     return generate_composition_read(db, team_id)
+
+
+# ---------- Scouting ----------
+
+@router.get("/team/{team_id}/scouting/{opponent_name}", response_model=ScoutingReport)
+@limiter.limit("10/minute;60/hour")
+def get_ai_scouting_report(
+    request: Request,
+    team_id: UUID,
+    opponent_name: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_current_user),
+):
+    if team_id != auth.require_team():
+        from core.errors import Forbidden
+        raise Forbidden("You can only scout opponents for your own team.")
+    if not is_enabled():
+        raise UpstreamError("Gemini API key not configured.")
+    payload = build_scouting_payload(db, team_id, opponent_name)
+    if payload["total_games"] == 0:
+        raise NotFound(f"No history against '{opponent_name}'.")
+    return generate_scouting_report(payload)

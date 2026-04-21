@@ -13,7 +13,7 @@ import { Badge, roleVariant } from '../components/ui/Badge';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../lib/api';
 import { chartAxisProps, chartGridProps, chartTooltipStyle, CHART_COLORS } from '../lib/chartTheme';
-import type { Player, PlayerByAgentRow, PlayerByMapRow, PlayerSummary, PlayerTrendPoint, PlayerWeaknessReport, RoleBenchmark } from '../lib/types';
+import type { DeathOrderStats, Player, PlayerByAgentRow, PlayerByMapRow, PlayerSummary, PlayerTrendPoint, PlayerWeaknessReport, RoleBenchmark } from '../lib/types';
 
 export function PlayerPerformance() {
   const { playerId } = useParams();
@@ -26,6 +26,7 @@ export function PlayerPerformance() {
   const [byMap, setByMap] = useState<PlayerByMapRow[]>([]);
   const [trend, setTrend] = useState<PlayerTrendPoint[]>([]);
   const [bench, setBench] = useState<RoleBenchmark | null>(null);
+  const [death, setDeath] = useState<DeathOrderStats | null>(null);
   const [weakness, setWeakness] = useState<PlayerWeaknessReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -52,10 +53,11 @@ export function PlayerPerformance() {
       api.getPlayerByMap(playerId),
       api.getPlayerTrend(playerId, 20),
       api.getPlayerBenchmarks(playerId),
+      api.getPlayerDeathOrder(playerId).catch(() => null),
     ])
-      .then(([s, a, m, t, b]) => {
+      .then(([s, a, m, t, b, d]) => {
         if (cancelled) return;
-        setSummary(s); setByAgent(a); setByMap(m); setTrend(t); setBench(b);
+        setSummary(s); setByAgent(a); setByMap(m); setTrend(t); setBench(b); setDeath(d);
         setWeakness(null);
       })
       .catch((e: Error) => { if (!cancelled) setError(e.message); })
@@ -196,6 +198,30 @@ export function PlayerPerformance() {
                   )}
                 </section>
               </div>
+
+              {death && (
+                <section className="bg-bg-surface border border-border-default rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display text-xl">Death-order (round-level)</h2>
+                    <Badge variant={death.total_rounds > 0 ? 'accent' : 'neutral'}>
+                      {death.total_rounds} rondas
+                    </Badge>
+                  </div>
+                  {death.total_rounds === 0 ? (
+                    <div className="text-sm text-text-secondary py-4">
+                      Métrica round-level sin datos. Requiere sincronización con la API de Riot (RoundEvent).
+                      Se activa automáticamente cuando haya partidas con <code className="font-mono text-xs bg-bg-elevated px-1 rounded">data_source=api</code>.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <KPITile label="First Death Rate" value={`${death.first_death_rate.toFixed(1)}%`} hint={`${death.fd_count} rondas`} accent="accent" />
+                      <KPITile label="First Blood Rate" value={`${death.first_blood_rate.toFixed(1)}%`} hint={`${death.fb_count} rondas`} accent="success" />
+                      <KPITile label="Survival Rate" value={`${death.survival_rate.toFixed(1)}%`} />
+                      <KPITile label="Total rondas" value={death.total_rounds} />
+                    </div>
+                  )}
+                </section>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SplitTable
