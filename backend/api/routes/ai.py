@@ -19,7 +19,7 @@ from core.ai.prompts.player_weakness import generate_player_weakness_report
 from core.ai.prompts.scouting import generate_scouting_report, ScoutingReport
 from core.analytics.scouting import scouting_report as build_scouting_payload
 from core.auth.current_user import AuthContext, get_current_user
-from core.errors import NotFound, UpstreamError
+from core.errors import Forbidden, NotFound, UpstreamError
 from core.ratelimit import limiter
 from database import get_db
 import models
@@ -39,7 +39,6 @@ def _assert_match_in_team(db: Session, match_id: UUID, team_id: UUID) -> models.
     if not match:
         raise NotFound("Match not found.")
     if match.team_id != team_id:
-        from core.errors import Forbidden
         raise Forbidden("Match belongs to a different team.")
     return match
 
@@ -182,7 +181,6 @@ def get_composition_read(
     auth: AuthContext = Depends(get_current_user),
 ):
     if team_id != auth.require_team():
-        from core.errors import Forbidden
         raise Forbidden("You can only read your own team's composition.")
     if not is_enabled():
         raise UpstreamError("Gemini API key not configured.")
@@ -201,7 +199,6 @@ def get_ai_scouting_report(
     auth: AuthContext = Depends(get_current_user),
 ):
     if team_id != auth.require_team():
-        from core.errors import Forbidden
         raise Forbidden("You can only scout opponents for your own team.")
     if not is_enabled():
         raise UpstreamError("Gemini API key not configured.")

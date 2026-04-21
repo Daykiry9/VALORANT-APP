@@ -1,8 +1,7 @@
 """Opponent scouting: aggregate everything we know about a rival from our matches
 against them. Feeds both the UI page and the scouting AI prompt.
 """
-from __future__ import annotations
-
+from collections import defaultdict
 from typing import List
 from uuid import UUID
 
@@ -10,6 +9,7 @@ from sqlalchemy import case, desc, func
 from sqlalchemy.orm import Session
 
 import models
+from core.analytics._common import pct
 from core.cache import cached
 
 
@@ -37,7 +37,7 @@ def list_opponents(db: Session, team_id: UUID) -> List[dict]:
             "tier": r.tier,
             "games": int(r.games or 0),
             "wins": int(r.wins or 0),
-            "winrate": round((int(r.wins or 0) / int(r.games)) * 100, 1) if r.games else 0.0,
+            "winrate": pct(int(r.wins or 0), int(r.games or 0)),
             "last_faced": r.last_faced.isoformat() if r.last_faced else None,
         }
         for r in rows
@@ -46,13 +46,7 @@ def list_opponents(db: Session, team_id: UUID) -> List[dict]:
 
 @cached(namespace="scouting_report", ttl=300)
 def scouting_report(db: Session, team_id: UUID, opponent_name: str) -> dict:
-    """Aggregate stats for matches played against `opponent_name`.
-
-    Returns everything useful for a pre-match briefing: per-map winrate, pistol
-    pattern, composition pattern (their side), avg score, sample of matches.
-    """
-    win_case = case((models.Match.result == "W", 1), else_=0)
-
+    """Aggregate stats for matches played against `opponent_name`."""
     matches = (
         db.query(models.Match)
         .filter(models.Match.team_id == team_id)
@@ -64,6 +58,7 @@ def scouting_report(db: Session, team_id: UUID, opponent_name: str) -> dict:
     if not matches:
         return {
             "opponent_name": opponent_name,
+            "tier": None,
             "total_games": 0,
             "wins": 0, "losses": 0, "draws": 0,
             "winrate": 0.0,
@@ -74,36 +69,34 @@ def scouting_report(db: Session, team_id: UUID, opponent_name: str) -> dict:
         }
 
     total = len(matches)
-    wins = sum(1 for m in matches if (m.result or "").upper() == "W")
-    losses = sum(1 for m in matches if (m.result or "").upper() == "L")
-    draws = sum(1 for m in matches if (m.result or "").upper() == "D")
+    wins = sum(1 for m in matches if m.result == "W")
+    losses = sum(1 for m in matches if m.result == "L")
+    draws = sum(1 for m in matches if m.result == "D")
 
-    per_map_rows = (
-        db.query(
-            models.Match.map_name.label("map_name"),
-            func.count(models.Match.id).label("games"),
-            func.sum(win_case).label("wins"),
-            func.avg(models.Match.team_rounds_won).label("rw"),
-            func.avg(models.Match.team_rounds_lost).label("rl"),
-        )
-        .filter(models.Match.team_id == team_id)
-        .filter(models.Match.opponent_name == opponent_name)
-        .filter(models.Match.map_name.isnot(None))
-        .group_by(models.Match.map_name)
-        .order_by(desc("games"))
-        .all()
+    buckets: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0, "rw": 0, "rl": 0})
+    for m in matches:
+        if not m.map_name:
+            continue
+        b = buckets[m.map_name]
+        b["games"] += 1
+        if m.result == "W":
+            b["wins"] += 1
+        b["rw"] += m.team_rounds_won or 0
+        b["rl"] += m.team_rounds_lost or 0
+    by_map = sorted(
+        [
+            {
+                "map_name": name,
+                "games": b["games"],
+                "wins": b["wins"],
+                "winrate": pct(b["wins"], b["games"]),
+                "avg_round_diff": round((b["rw"] - b["rl"]) / b["games"], 2) if b["games"] else 0.0,
+            }
+            for name, b in buckets.items()
+        ],
+        key=lambda r: r["games"],
+        reverse=True,
     )
-
-    by_map = [
-        {
-            "map_name": r.map_name,
-            "games": int(r.games or 0),
-            "wins": int(r.wins or 0),
-            "winrate": round((int(r.wins or 0) / int(r.games)) * 100, 1) if r.games else 0.0,
-            "avg_round_diff": round(float(r.rw or 0) - float(r.rl or 0), 2),
-        }
-        for r in per_map_rows
-    ]
 
     pistol_pattern = {
         "def_won": sum(1 for m in matches if m.def_pistol == "W"),
@@ -134,7 +127,7 @@ def scouting_report(db: Session, team_id: UUID, opponent_name: str) -> dict:
         "wins": wins,
         "losses": losses,
         "draws": draws,
-        "winrate": round((wins / total) * 100, 1) if total else 0.0,
+        "winrate": pct(wins, total),
         "avg_round_diff": round(avg_rw - avg_rl, 2),
         "by_map": by_map,
         "pistol_pattern": pistol_pattern,

@@ -1,17 +1,19 @@
 """Pre-match scouting briefing. Outputs ScoutingReport."""
-from __future__ import annotations
-
 import json
-from typing import List
+from typing import List, Literal
+
 from pydantic import BaseModel
 
 from core.ai.config import GenParams
 from core.ai.structured import generate_structured
 
 
+ThreatLevel = Literal["low", "medium", "high", "elite"]
+
+
 class ScoutingReport(BaseModel):
-    threat_level: str  # low | medium | high | elite
-    map_priority: List[str]  # maps in order of "pick first" vs them
+    threat_level: ThreatLevel
+    map_priority: List[str]
     map_to_ban: List[str]
     expected_playstyle: str
     detected_weaknesses: List[str]

@@ -4,10 +4,7 @@ Gemini API key burn and abuse.
 Keyed by (team_id when authenticated, else IP). Limits per route are enforced
 via `@limiter.limit("N/minute")` decorators.
 """
-from __future__ import annotations
-
 import os
-from typing import Callable
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address

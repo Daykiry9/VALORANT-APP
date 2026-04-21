@@ -17,8 +17,6 @@ from core.errors import NotFound
 from schemas import MatchInsightContent
 
 
-# ---- STABLE PREFIX (cacheable across calls) ----
-
 _PERSONA = """Eres un analista profesional de Valorant (nivel VCT Américas). Tu trabajo es entregar
 un briefing táctico basado en datos, objetivo y accionable — NO motivacional, NO genérico.
 Usa terminología correcta de Valorant: entry, trade, utility burn, post-plant, retake, default,
@@ -92,8 +90,6 @@ Output esperado:
 }"""
 
 
-# ---- Runtime: only the trailing section changes ----
-
 def _format_stats(stats: list[models.MatchPlayerStat]) -> str:
     lines = []
     for s in stats:
@@ -126,7 +122,6 @@ Stats por jugador:
 
 Responde con el JSON MatchInsightContent ahora."""
 
-    # Order matters: stable prefix FIRST (gets cached), dynamic LAST.
     return f"{_PERSONA}\n\n{_FEW_SHOT}\n\n{match_block}"
 
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Crosshair, Shield, Sparkles, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -6,18 +6,19 @@ import toast from 'react-hot-toast';
 import { FadePage } from '../components/motion/FadePage';
 import { DataBoundary } from '../components/ui/DataBoundary';
 import { Badge, tierVariant } from '../components/ui/Badge';
+import { KPITile } from '../components/ui/KPITile';
 import { ResultPill } from '../components/ui/ResultPill';
 import { MapThumbnail } from '../components/ui/MapThumbnail';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../lib/api';
 import type { OpponentListRow, ScoutingAIReport, ScoutingPayload } from '../lib/types';
 
-const THREAT_STYLE = {
-  low: { color: 'bg-success/10 text-success border-success/40', label: 'Bajo' },
-  medium: { color: 'bg-accent-orange/10 text-accent-orange border-accent-orange/40', label: 'Medio' },
-  high: { color: 'bg-accent/10 text-accent border-accent/40', label: 'Alto' },
-  elite: { color: 'bg-accent/20 text-accent border-accent/60', label: 'Elite' },
-} as const;
+const THREAT_META: Record<ScoutingAIReport['threat_level'], { label: string; variant: 'success' | 'warning' | 'accent' }> = {
+  low: { label: 'Bajo', variant: 'success' },
+  medium: { label: 'Medio', variant: 'warning' },
+  high: { label: 'Alto', variant: 'accent' },
+  elite: { label: 'Elite', variant: 'accent' },
+};
 
 export function Scouting() {
   const { opponent } = useParams();
@@ -34,7 +35,11 @@ export function Scouting() {
 
   useEffect(() => {
     if (!currentTeamId) return;
-    api.getOpponents(currentTeamId).then(setOpponents).catch((e: Error) => setError(e.message));
+    let cancelled = false;
+    api.getOpponents(currentTeamId)
+      .then((list) => { if (!cancelled) setOpponents(list); })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
   }, [currentTeamId]);
 
   useEffect(() => {
@@ -59,7 +64,7 @@ export function Scouting() {
     } finally { setAiLoading(false); }
   }
 
-  const threat = useMemo(() => ai ? THREAT_STYLE[ai.threat_level] : null, [ai]);
+  const threat = ai && THREAT_META[ai.threat_level];
 
   return (
     <FadePage>
@@ -115,12 +120,14 @@ export function Scouting() {
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     {report.tier && <Badge variant={tierVariant(report.tier)}>{report.tier}</Badge>}
-                    <ResultPill result={report.winrate >= 50 ? 'W' : 'L'} score={`${report.wins}-${report.losses}`} />
+                    <Badge variant={report.winrate >= 50 ? 'success' : 'accent'}>
+                      {report.wins}W-{report.losses}L-{report.draws}D
+                    </Badge>
                     <span className="text-sm text-text-secondary">{report.total_games} partidas · Δ {report.avg_round_diff}</span>
                     {threat && (
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border font-mono text-xs ${threat.color}`}>
-                        <AlertTriangle size={12} /> Threat: {threat.label}
-                      </span>
+                      <Badge variant={threat.variant}>
+                        <AlertTriangle size={10} /> Threat: {threat.label}
+                      </Badge>
                     )}
                   </div>
                   <button
@@ -159,11 +166,11 @@ export function Scouting() {
 
                   <section className="bg-bg-surface border border-border-default rounded-xl p-6 space-y-4">
                     <h2 className="font-display text-xl">Pistol pattern</h2>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <PistolTile label="DEF pistol ganado" value={report.pistol_pattern.def_won} tone="success" />
-                      <PistolTile label="DEF pistol perdido" value={report.pistol_pattern.def_lost} tone="accent" />
-                      <PistolTile label="ATK pistol ganado" value={report.pistol_pattern.att_won} tone="success" />
-                      <PistolTile label="ATK pistol perdido" value={report.pistol_pattern.att_lost} tone="accent" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <KPITile label="DEF pistol ganado" value={report.pistol_pattern.def_won} accent="success" />
+                      <KPITile label="DEF pistol perdido" value={report.pistol_pattern.def_lost} accent="accent" />
+                      <KPITile label="ATK pistol ganado" value={report.pistol_pattern.att_won} accent="success" />
+                      <KPITile label="ATK pistol perdido" value={report.pistol_pattern.att_lost} accent="accent" />
                     </div>
 
                     <h3 className="font-display text-lg mt-4 flex items-center gap-2">
@@ -196,8 +203,8 @@ export function Scouting() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      <ChipList title="Prioridad de picks" items={ai.map_priority} tone="success" />
-                      <ChipList title="Mapas a banear" items={ai.map_to_ban} tone="accent" />
+                      <ChipList title="Prioridad de picks" items={ai.map_priority} variant="success" />
+                      <ChipList title="Mapas a banear" items={ai.map_to_ban} variant="accent" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm">
@@ -225,15 +232,6 @@ export function Scouting() {
   );
 }
 
-function PistolTile({ label, value, tone }: { label: string; value: number; tone: 'success' | 'accent' }) {
-  return (
-    <div className={`p-3 rounded-lg border bg-bg-elevated ${tone === 'success' ? 'border-success/30' : 'border-accent/30'}`}>
-      <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">{label}</div>
-      <div className={`font-display text-2xl ${tone === 'success' ? 'text-success' : 'text-accent'}`}>{value}</div>
-    </div>
-  );
-}
-
 function AiBlock({ title, body }: { title: string; body: string }) {
   return (
     <div className="p-3 rounded-lg border border-border-default bg-bg-elevated">
@@ -243,8 +241,7 @@ function AiBlock({ title, body }: { title: string; body: string }) {
   );
 }
 
-function ChipList({ title, items, tone }: { title: string; items: string[]; tone: 'success' | 'accent' }) {
-  const cls = tone === 'success' ? 'bg-success/10 text-success border-success/40' : 'bg-accent/10 text-accent border-accent/40';
+function ChipList({ title, items, variant }: { title: string; items: string[]; variant: 'success' | 'accent' }) {
   return (
     <div>
       <div className="text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1">{title}</div>
@@ -252,9 +249,7 @@ function ChipList({ title, items, tone }: { title: string; items: string[]; tone
         {items.length === 0 ? (
           <span className="text-xs text-text-secondary">—</span>
         ) : (
-          items.map((x, i) => (
-            <span key={i} className={`px-2 py-0.5 rounded-md border font-mono text-xs ${cls}`}>{x}</span>
-          ))
+          items.map((x, i) => <Badge key={i} variant={variant}>{x}</Badge>)
         )}
       </div>
     </div>

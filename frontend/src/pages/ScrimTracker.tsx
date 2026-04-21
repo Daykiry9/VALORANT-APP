@@ -10,7 +10,9 @@ import { MapThumbnail } from '../components/ui/MapThumbnail';
 import { Badge } from '../components/ui/Badge';
 import { useTeam } from '../context/TeamContext';
 import { api } from '../lib/api';
-import type { Match, OcrScoreboard } from '../lib/types';
+import type { Match, OcrScoreboard, Tier } from '../lib/types';
+
+const TIERS: Tier[] = ['T1', 'T2', 'T3', 'T4'];
 
 interface Draft {
   map_name: string;
@@ -135,21 +137,7 @@ export function ScrimTracker() {
         attack_rounds_won: 0,
         composition: JSON.stringify(draft.players.map((p) => p.agent).filter(Boolean)),
         vod_link: draft.vod_link || null,
-        players_data: draft.players.map((p) => ({
-          display_name: p.display_name,
-          agent: p.agent,
-          acs: p.acs,
-          kills: p.kills,
-          deaths: p.deaths,
-          assists: p.assists,
-          first_bloods: p.first_bloods,
-          first_deaths: p.first_deaths,
-          hs_pct: p.hs_pct,
-          kast_pct: p.kast_pct,
-          adr: p.adr,
-          plants: p.plants,
-          defuses: p.defuses,
-        })),
+        players_data: draft.players,
       });
       toast.success('Scrim guardado');
       setDraft(null);
@@ -229,7 +217,7 @@ export function ScrimTracker() {
                 <select value={draft.opponent_tier} onChange={(e) => setDraft({ ...draft, opponent_tier: e.target.value })}
                   className="w-full bg-bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-sm">
                   <option value="">—</option>
-                  <option>T1</option><option>T2</option><option>T3</option><option>T4</option>
+                  {TIERS.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </Field>
               <Field label="Nuestro score">
